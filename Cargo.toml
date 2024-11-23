@@ -7,3 +7,5 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+serenity = "0.12.3"
+tokio = { version = "1.41.1", features = ["macros", "rt-multi-thread"] }
