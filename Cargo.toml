@@ -2,6 +2,8 @@
 name = "gatehook"
 version = "0.1.0-initial.1.0"
 authors = ["Atsushi KAWASAKI <ak@xlix.org>"]
+description = "Convert events on Discord's Gateway (WebSocket API) to simple Webhook events."
 edition = "2021"
+license = "MIT"
 
 [dependencies]
