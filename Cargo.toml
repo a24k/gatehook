@@ -1,6 +1,7 @@
 [package]
 name = "gatehook"
-version = "0.1.0"
+version = "0.1.0-initial.1.0"
+authors = ["Atsushi KAWASAKI <ak@xlix.org>"]
 edition = "2021"
 
 [dependencies]
