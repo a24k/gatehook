@@ -5,7 +5,7 @@ Convert events on Discord's Gateway (WebSocket API) to simple Webhook events.
 
 ## Supported Gateway Intents
 
-[List of Intents](https://discord.com/developers/docs/events/gateway#list-of-intents)
+[Discord Developer Portal - List of Intents](https://discord.com/developers/docs/events/gateway#list-of-intents)
 
 - [ ] GUILDS
   - `GUILD_CREATE` `GUILD_UPDATE` `GUILD_DELETE`
@@ -65,5 +65,5 @@ Convert events on Discord's Gateway (WebSocket API) to simple Webhook events.
 
 ## References
 
-- [Discord.dev - Overview of Events](https://discord.com/developers/docs/events/overview)
+- [Discord Developer Portal - Overview of Events](https://discord.com/developers/docs/events/overview)
 - [serenity](https://github.com/serenity-rs/serenity)
