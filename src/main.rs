@@ -2,12 +2,18 @@ use std::env;
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
+use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn ready(&self, _: Context, ready: Ready) {
+        println!("{} is connected!", ready.user.display_name());
+        dbg!(&ready);
+    }
+
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "Ping!" {
             if let Err(why) = msg.reply(&ctx.http, "Pong!").await {
