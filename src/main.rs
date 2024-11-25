@@ -12,6 +12,7 @@ impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.display_name());
         dbg!(&ready);
+        println!("Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot", ready.application.id);
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
