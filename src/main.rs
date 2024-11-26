@@ -12,7 +12,10 @@ impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.display_name());
         dbg!(&ready);
-        println!("Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot", ready.application.id);
+        println!(
+            "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
+            ready.application.id
+        );
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
@@ -29,9 +32,7 @@ async fn main() {
     // Login with a bot token from the environment
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::DIRECT_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)
