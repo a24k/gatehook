@@ -29,7 +29,7 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn reaction_add(&self, _: Context, reaction: Reaction) {
+    async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
         dbg!(&reaction);
     }
 }
