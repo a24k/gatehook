@@ -6,6 +6,11 @@ jobs:
   build:
     name: docker build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     steps:
       - uses: docker/metadata-action@v5
         id: metadata
