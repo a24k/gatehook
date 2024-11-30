@@ -1,0 +1,1 @@
+docker build --platform linux/amd64,linux/arm64 --build-context messense/rust-musl-cross:arm64-musl=docker-image://messense/rust-musl-cross:aarch64-musl --build-context messense/rust-musl-cross:amd64-musl=docker-image://messense/rust-musl-cross:x86_64-musl -t gatehook . 
