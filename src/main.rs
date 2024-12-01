@@ -30,6 +30,14 @@ impl EventHandler for Handler {
                 println!("Error sending message: {why:?}");
             }
         }
+
+        // simple web get request
+        let client = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(true) // TODO: to be optional
+            .build()
+            .unwrap();
+        let res = client.get(&self.webhook_url).send().await;
+        dbg!(&res);
     }
 
     async fn reaction_add(&self, _: Context, reaction: Reaction) {
