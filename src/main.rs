@@ -6,17 +6,20 @@ use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
-struct Handler;
+struct Handler {
+    webhook_url: String,
+}
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.display_name());
-        dbg!(&ready);
+        // dbg!(&ready);
         println!(
             "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
             ready.application.id
         );
+        println!("Webhook URL: {}", self.webhook_url);
     }
 
     async fn message(&self, ctx: Context, message: Message) {
@@ -38,6 +41,12 @@ impl EventHandler for Handler {
 async fn main() {
     // Login with a bot token from the environment
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    dbg!(&token);
+
+    // Webhook URL from the environment
+    let webhook_url = env::var("WEBHOOK_URL").expect("Expected a webhook url in the environment");
+    dbg!(&webhook_url);
+
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::DIRECT_MESSAGE_REACTIONS
@@ -45,7 +54,7 @@ async fn main() {
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
+        .event_handler(Handler { webhook_url })
         .await
         .expect("Err creating client");
 
