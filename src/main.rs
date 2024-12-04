@@ -36,7 +36,12 @@ impl EventHandler for Handler {
             .danger_accept_invalid_certs(true) // TODO: to be optional
             .build()
             .unwrap();
-        let res = client.get(&self.webhook_url).send().await;
+        let res = client
+            .post(&self.webhook_url)
+            .query(&[("handler", "message")])
+            .json(&message)
+            .send()
+            .await;
         dbg!(&res);
     }
 
