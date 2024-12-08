@@ -1,4 +1,6 @@
-use std::env;
+mod params;
+
+use anyhow::Context as _;
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -8,6 +10,21 @@ use serenity::prelude::*;
 
 struct Handler {
     webhook_url: String,
+    httpclient: reqwest::Client,
+}
+
+impl Handler {
+    fn new(params: &params::Params) -> anyhow::Result<Handler> {
+        let httpclient = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(params.insecure_mode)
+            .build()
+            .context("Building HTTP Client")?;
+
+        Ok(Handler {
+            webhook_url: params.webhook_url.clone(),
+            httpclient,
+        })
+    }
 }
 
 #[async_trait]
@@ -32,11 +49,8 @@ impl EventHandler for Handler {
         }
 
         // simple web get request
-        let client = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(true) // TODO: to be optional
-            .build()
-            .unwrap();
-        let res = client
+        let res = self
+            .httpclient
             .post(&self.webhook_url)
             .query(&[("handler", "message")])
             .json(&message)
@@ -51,14 +65,9 @@ impl EventHandler for Handler {
 }
 
 #[tokio::main]
-async fn main() {
-    // Login with a bot token from the environment
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-    dbg!(&token);
-
-    // Webhook URL from the environment
-    let webhook_url = env::var("WEBHOOK_URL").expect("Expected a webhook url in the environment");
-    dbg!(&webhook_url);
+async fn main() -> anyhow::Result<()> {
+    let params = params::Params::new()?;
+    dbg!(&params);
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
@@ -66,13 +75,13 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot.
-    let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { webhook_url })
+    let mut client = Client::builder(&params.discord_token, intents)
+        .event_handler(Handler::new(&params)?)
         .await
-        .expect("Err creating client");
+        .context("Creating Discord Client")?;
 
     // Start listening for events by starting a single shard
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client.start().await.context("Starting Discord Client")?;
+
+    Ok(())
 }
