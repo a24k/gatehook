@@ -1,4 +1,4 @@
-use std::env;
+mod params;
 
 use anyhow::Context as _;
 
@@ -8,30 +8,20 @@ use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
-fn fetch_env(key: &str) -> anyhow::Result<String> {
-    env::var(key).with_context(|| format!("Fetching environment variable: {}", key))
-}
-
 struct Handler {
     webhook_url: String,
     httpclient: reqwest::Client,
 }
 
 impl Handler {
-    fn new() -> anyhow::Result<Handler> {
-        let insecure = fetch_env("INSECURE").is_ok();
-        dbg!(&insecure);
-
-        let webhook_url = fetch_env("WEBHOOK_URL")?;
-        dbg!(&webhook_url);
-
+    fn new(params: &params::Params) -> anyhow::Result<Handler> {
         let httpclient = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(insecure)
+            .danger_accept_invalid_certs(params.insecure_mode)
             .build()
             .context("Building HTTP Client")?;
 
         Ok(Handler {
-            webhook_url,
+            webhook_url: params.webhook_url.clone(),
             httpclient,
         })
     }
@@ -76,9 +66,8 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Login with a bot token from the environment
-    let token = fetch_env("DISCORD_TOKEN")?;
-    dbg!(&token);
+    let params = params::Params::new()?;
+    dbg!(&params);
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
@@ -86,8 +75,8 @@ async fn main() -> anyhow::Result<()> {
         | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot.
-    let mut client = Client::builder(&token, intents)
-        .event_handler(Handler::new()?)
+    let mut client = Client::builder(&params.discord_token, intents)
+        .event_handler(Handler::new(&params)?)
         .await
         .context("Creating Discord Client")?;
 
