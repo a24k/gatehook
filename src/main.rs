@@ -8,9 +8,33 @@ use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
+fn fetch_env(key: &str) -> anyhow::Result<String> {
+    env::var(key).with_context(|| format!("Fetching environment variable: {}", key))
+}
+
 struct Handler {
-    insecure: bool,
     webhook_url: String,
+    httpclient: reqwest::Client,
+}
+
+impl Handler {
+    fn new() -> anyhow::Result<Handler> {
+        let insecure = fetch_env("INSECURE").is_ok();
+        dbg!(&insecure);
+
+        let webhook_url = fetch_env("WEBHOOK_URL")?;
+        dbg!(&webhook_url);
+
+        let httpclient = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(insecure)
+            .build()
+            .context("Building HTTP Client")?;
+
+        Ok(Handler {
+            webhook_url,
+            httpclient,
+        })
+    }
 }
 
 #[async_trait]
@@ -35,11 +59,8 @@ impl EventHandler for Handler {
         }
 
         // simple web get request
-        let client = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(self.insecure)
-            .build()
-            .unwrap();
-        let res = client
+        let res = self
+            .httpclient
             .post(&self.webhook_url)
             .query(&[("handler", "message")])
             .json(&message)
@@ -53,22 +74,11 @@ impl EventHandler for Handler {
     }
 }
 
-fn fetch_env(key: &str) -> anyhow::Result<String> {
-    env::var(key).with_context(|| format!("Fetching environment variable: {}", key))
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Login with a bot token from the environment
     let token = fetch_env("DISCORD_TOKEN")?;
     dbg!(&token);
-
-    // Webhook URL from the environment
-    let webhook_url = fetch_env("WEBHOOK_URL")?;
-    dbg!(&webhook_url);
-
-    let insecure = fetch_env("INSECURE").is_ok();
-    dbg!(&insecure);
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
@@ -77,10 +87,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler {
-            insecure,
-            webhook_url,
-        })
+        .event_handler(Handler::new()?)
         .await
         .context("Creating Discord Client")?;
 
