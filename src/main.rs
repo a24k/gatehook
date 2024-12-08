@@ -1,5 +1,7 @@
 use std::env;
 
+use anyhow::Context as _;
+
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::channel::Reaction;
@@ -51,13 +53,15 @@ impl EventHandler for Handler {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // Login with a bot token from the environment
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let token =
+        env::var("DISCORD_TOKEN").context("Fetching environment variable: DISCORD_TOKEN")?;
     dbg!(&token);
 
     // Webhook URL from the environment
-    let webhook_url = env::var("WEBHOOK_URL").expect("Expected a webhook url in the environment");
+    let webhook_url =
+        env::var("WEBHOOK_URL").context("Fetching environment variable: WEBHOOK_URL")?;
     dbg!(&webhook_url);
 
     // Set gateway intents, which decides what events the bot will be notified about
@@ -69,10 +73,10 @@ async fn main() {
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler { webhook_url })
         .await
-        .expect("Err creating client");
+        .context("Creating Discord Client")?;
 
     // Start listening for events by starting a single shard
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client.start().await.context("Starting Discord Client")?;
+
+    Ok(())
 }
