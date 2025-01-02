@@ -81,7 +81,23 @@ async fn main() -> anyhow::Result<()> {
         .context("Creating Discord Client")?;
 
     // Start listening for events by starting a single shard
-    client.start().await.context("Starting Discord Client")?;
+    //client.start().await.context("Running Discord Client")
 
-    Ok(())
+    let shard_manager = client.shard_manager.clone();
+
+    let task = tokio::spawn(async move {
+        client
+            .start_autosharded()
+            .await
+            .context("Starting Discord Client")
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+    let count = shard_manager.shards_instantiated().await.len();
+    println!("Shard count instantiated: {}", count);
+
+    tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+    shard_manager.shutdown_all().await;
+
+    task.await?
 }
