@@ -8,6 +8,11 @@ on:
       - "v*.*.*"
   pull_request:
 
+# Cancel outdated builds when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: docker build
@@ -42,7 +47,8 @@ jobs:
         with:
           file: Dockerfile
           context: .
-          platforms: linux/amd64,linux/arm64
+          # Build only amd64 for PRs to save time, both platforms for main/tags
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           build-contexts: |
             messense/rust-musl-cross:amd64-musl=docker-image://messense/rust-musl-cross:x86_64-musl
             messense/rust-musl-cross:arm64-musl=docker-image://messense/rust-musl-cross:aarch64-musl
