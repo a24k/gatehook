@@ -24,13 +24,8 @@ jobs:
           field: 'package.version'
 
       - name: Create and push tag
-        id: create_tag
         uses: rickstaa/action-create-tag@v1
         with:
           tag: "v${{ steps.get_version.outputs.value }}"
           tag_exists_error: false
           message: "Release v${{ steps.get_version.outputs.value }}"
-
-      - name: Show tag status
-        run: |
-          echo "Tag v${{ steps.get_version.outputs.value }} - Already exists: ${{ steps.create_tag.outputs.tag_exists }}"
