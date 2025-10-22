@@ -15,6 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
       - name: Extract version from Cargo.toml
         id: get_version
@@ -29,3 +30,4 @@ jobs:
           tag: "v${{ steps.get_version.outputs.value }}"
           tag_exists_error: false
           message: "Release v${{ steps.get_version.outputs.value }}"
+          github_token: ${{ secrets.GH_PAT }}
