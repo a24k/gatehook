@@ -3,6 +3,41 @@
 
 Convert events on Discord's Gateway (WebSocket API) to simple Webhook events.
 
+## Environment Variables
+
+The following environment variables are required or optional for running gatehook:
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `DISCORD_TOKEN` | Yes | Discord bot token obtained from Discord Developer Portal | `MTA1234...` |
+| `WEBHOOK_URL` | Yes | The webhook endpoint URL to forward Discord events | `https://example.com/webhook` |
+| `INSECURE_MODE` | No | Accept invalid TLS certificates (for testing only). Set any value to enable. | `true` or `1` |
+| `RUST_LOG` | No | Control logging level. See [Logging](#logging) section for details. | `info`, `debug`, `trace` |
+
+## Logging
+
+gatehook uses the [tracing](https://github.com/tokio-rs/tracing) crate for structured logging. You can control the log level using the `RUST_LOG` environment variable.
+
+### Log Levels
+
+- `RUST_LOG=error` - Show only error messages
+- `RUST_LOG=info` - Show informational messages (default)
+- `RUST_LOG=debug` - Show detailed debug information including message contents
+- `RUST_LOG=trace` - Show very verbose logs for debugging
+
+### Examples
+
+```bash
+# Run with default (info) logging
+./gatehook
+
+# Run with debug logging to see all message details
+RUST_LOG=debug ./gatehook
+
+# Run with specific module logging
+RUST_LOG=gatehook=debug ./gatehook
+```
+
 ## Supported Gateway Intents
 
 [Discord Developer Portal - List of Intents](https://discord.com/developers/docs/events/gateway#list-of-intents)

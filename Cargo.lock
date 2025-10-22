@@ -33,6 +33,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.94"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
+
+[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -469,8 +475,9 @@ dependencies = [
 
 [[package]]
 name = "gatehook"
-version = "0.2.0"
+version = "0.3.0-errorhandle.5.0"
 dependencies = [
+ "anyhow",
  "reqwest 0.12.9",
  "serenity",
  "tokio",
@@ -1156,7 +1163,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

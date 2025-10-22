@@ -1,4 +1,7 @@
-use std::env;
+mod params;
+
+use anyhow::Context as _;
+use tracing::{debug, error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -8,57 +11,102 @@ use serenity::prelude::*;
 
 struct Handler {
     webhook_url: String,
+    httpclient: reqwest::Client,
+}
+
+impl Handler {
+    fn new(params: &params::Params) -> anyhow::Result<Handler> {
+        let httpclient = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(params.insecure_mode)
+            .build()
+            .context("Building HTTP Client")?;
+
+        Ok(Handler {
+            webhook_url: params.webhook_url.clone(),
+            httpclient,
+        })
+    }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.display_name());
-        // dbg!(&ready);
-        println!(
+        info!(
+            display_name = %ready.user.display_name(),
+            "Bot is connected"
+        );
+        info!(
+            client_id = %ready.application.id,
             "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
             ready.application.id
         );
-        println!("Webhook URL: {}", self.webhook_url);
+        info!(webhook_url = %self.webhook_url, "Webhook configured");
     }
 
     async fn message(&self, ctx: Context, message: Message) {
-        dbg!(&message);
+        debug!(
+            message_id = %message.id,
+            author = %message.author.name,
+            content = %message.content,
+            "Received message"
+        );
 
         if message.content == "Ping!" {
             if let Err(why) = message.reply(&ctx.http, "Pong!").await {
-                println!("Error sending message: {why:?}");
+                error!(error = ?why, "Failed to send message reply");
             }
         }
 
-        // simple web get request
-        let client = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(true) // TODO: to be optional
-            .build()
-            .unwrap();
-        let res = client
+        // Send message to webhook endpoint
+        let res = self
+            .httpclient
             .post(&self.webhook_url)
             .query(&[("handler", "message")])
             .json(&message)
             .send()
             .await;
-        dbg!(&res);
+
+        match res {
+            Ok(response) => {
+                info!(
+                    status = %response.status(),
+                    message_id = %message.id,
+                    "Successfully sent message to webhook"
+                );
+            }
+            Err(err) => {
+                error!(
+                    error = ?err,
+                    message_id = %message.id,
+                    webhook_url = %self.webhook_url,
+                    "Failed to send message to webhook"
+                );
+            }
+        }
     }
 
     async fn reaction_add(&self, _: Context, reaction: Reaction) {
-        dbg!(&reaction);
+        debug!(
+            message_id = %reaction.message_id,
+            user_id = ?reaction.user_id,
+            emoji = ?reaction.emoji,
+            "Received reaction"
+        );
     }
 }
 
 #[tokio::main]
-async fn main() {
-    // Login with a bot token from the environment
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-    dbg!(&token);
+async fn main() -> anyhow::Result<()> {
+    // Initialize tracing subscriber for structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into()),
+        )
+        .init();
 
-    // Webhook URL from the environment
-    let webhook_url = env::var("WEBHOOK_URL").expect("Expected a webhook url in the environment");
-    dbg!(&webhook_url);
+    let params = params::Params::new()?;
+    info!(?params, "Application parameters loaded");
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
@@ -66,13 +114,14 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot.
-    let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { webhook_url })
+    let mut client = Client::builder(&params.discord_token, intents)
+        .event_handler(Handler::new(&params)?)
         .await
-        .expect("Err creating client");
+        .context("Creating Discord Client")?;
 
     // Start listening for events by starting a single shard
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client
+        .start_autosharded()
+        .await
+        .context("Running Discord Client")
 }
