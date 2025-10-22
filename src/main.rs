@@ -1,6 +1,7 @@
 mod params;
 
 use anyhow::Context as _;
+use tracing::{debug, error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -30,25 +31,33 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.display_name());
-        // dbg!(&ready);
-        println!(
+        info!(
+            display_name = %ready.user.display_name(),
+            "Bot is connected"
+        );
+        info!(
+            client_id = %ready.application.id,
             "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
             ready.application.id
         );
-        println!("Webhook URL: {}", self.webhook_url);
+        info!(webhook_url = %self.webhook_url, "Webhook configured");
     }
 
     async fn message(&self, ctx: Context, message: Message) {
-        dbg!(&message);
+        debug!(
+            message_id = %message.id,
+            author = %message.author.name,
+            content = %message.content,
+            "Received message"
+        );
 
         if message.content == "Ping!" {
             if let Err(why) = message.reply(&ctx.http, "Pong!").await {
-                println!("Error sending message: {why:?}");
+                error!(error = ?why, "Failed to send message reply");
             }
         }
 
-        // simple web get request
+        // Send message to webhook endpoint
         let res = self
             .httpclient
             .post(&self.webhook_url)
@@ -56,18 +65,48 @@ impl EventHandler for Handler {
             .json(&message)
             .send()
             .await;
-        dbg!(&res);
+
+        match res {
+            Ok(response) => {
+                info!(
+                    status = %response.status(),
+                    message_id = %message.id,
+                    "Successfully sent message to webhook"
+                );
+            }
+            Err(err) => {
+                error!(
+                    error = ?err,
+                    message_id = %message.id,
+                    webhook_url = %self.webhook_url,
+                    "Failed to send message to webhook"
+                );
+            }
+        }
     }
 
     async fn reaction_add(&self, _: Context, reaction: Reaction) {
-        dbg!(&reaction);
+        debug!(
+            message_id = %reaction.message_id,
+            user_id = ?reaction.user_id,
+            emoji = ?reaction.emoji,
+            "Received reaction"
+        );
     }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize tracing subscriber for structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into()),
+        )
+        .init();
+
     let params = params::Params::new()?;
-    dbg!(&params);
+    info!(?params, "Application parameters loaded");
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::DIRECT_MESSAGES
