@@ -49,9 +49,6 @@ jobs:
           context: .
           # Build only amd64 for PRs to save time, both platforms for main/tags
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
-          build-contexts: |
-            messense/rust-musl-cross:amd64-musl=docker-image://messense/rust-musl-cross:x86_64-musl
-            messense/rust-musl-cross:arm64-musl=docker-image://messense/rust-musl-cross:aarch64-musl
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ github.event_name != 'pull_request' }}

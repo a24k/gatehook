@@ -1,30 +1,36 @@
-FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:${TARGETARCH}-musl AS chef
-RUN cargo install cargo-chef
-WORKDIR /app
+# syntax=docker/dockerfile:1
 
-ARG TARGETARCH
-RUN if [ "$TARGETARCH" = "amd64" ]; then \
-      echo "x86_64-unknown-linux-musl" > /target; \
-    elif [ "$TARGETARCH" = "arm64" ]; then \
-      echo "aarch64-unknown-linux-musl" > /target; \
-    else \
-      echo "Unsupported platform: $TARGETARCH"; \
-      exit 1; \
-    fi
+ARG RUST_VERSION=1.85
+ARG APP_NAME=gatehook
+
+# cargo-chefを使った依存関係キャッシング
+FROM --platform=$BUILDPLATFORM lukemathwalker/cargo-chef:latest-rust-${RUST_VERSION}-bookworm AS chef
+WORKDIR /app
 
 FROM chef AS planner
 COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
-# Build dependencies - this is the caching layer
-RUN cargo chef cook --release --target $(cat /target) --recipe-path recipe.json
-# Build application
-COPY . .
-RUN cargo build --release --target $(cat /target) \
-    && cp target/$(cat /target)/release/gatehook target/release/gatehook
+ARG APP_NAME
 
-FROM --platform=$TARGETPLATFORM alpine
-COPY --from=builder /app/target/release/gatehook /gatehook
-CMD [ "/gatehook" ]
+# 依存関係のビルド（キャッシュ可能）
+COPY --from=planner /app/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    cargo chef cook --release --recipe-path recipe.json
+
+# アプリケーションのビルド
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
+    cargo build --release --bin ${APP_NAME} && \
+    cp ./target/release/${APP_NAME} /bin/server
+
+# 本番ステージ：distroless
+FROM --platform=$TARGETPLATFORM gcr.io/distroless/cc-debian12:nonroot AS runtime
+COPY --from=builder /bin/server /app/gatehook
+WORKDIR /app
+EXPOSE 8000
+ENTRYPOINT ["/app/gatehook"]
