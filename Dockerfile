@@ -25,6 +25,6 @@ COPY . .
 RUN cargo build --release --target $(cat /target) \
     && cp target/$(cat /target)/release/gatehook target/release/gatehook
 
-FROM alpine
+FROM --platform=$TARGETPLATFORM alpine
 COPY --from=builder /app/target/release/gatehook /gatehook
 CMD [ "/gatehook" ]
