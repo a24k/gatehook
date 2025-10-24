@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  docker-build-and-test:
+  build-and-test:
     name: Docker build and smoke test
     runs-on: ubuntu-latest
     permissions:
