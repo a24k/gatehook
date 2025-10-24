@@ -1,4 +1,4 @@
-name: Auto Tag on Merge
+name: CD - Auto Tag on Merge
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  auto-tag:
+  create-tag:
     name: Create version tag from Cargo.toml
     runs-on: ubuntu-latest
     permissions:

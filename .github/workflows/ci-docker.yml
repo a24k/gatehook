@@ -1,0 +1,73 @@
+name: CI - Docker Build and Test
+
+on: pull_request
+
+# Cancel outdated builds when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          file: Dockerfile
+          context: .
+          # Build only amd64 for PRs to save time
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: false
+          load: true
+          tags: gatehook:test
+
+      # Smoke test: Verify the Docker image can execute the binary
+      # This catches Dockerfile configuration issues like:
+      # - Incorrect ENTRYPOINT path
+      # - Binary not copied to correct location
+      # - File permission issues
+      # - Logging system not working
+      # Note: With musl static linking, runtime dependency issues are not expected
+      - name: Test Docker image startup
+        run: |
+          echo "=== Running Docker smoke test ==="
+
+          # Run binary without env vars - should produce error output
+          # This verifies: 1) binary executes, 2) logging works, 3) error handling works
+          docker run --rm gatehook:test 2>&1 | tee /tmp/docker-test-output.txt
+          EXIT_CODE=$?
+
+          echo ""
+          echo "Exit code: $EXIT_CODE"
+          echo "Output:"
+          cat /tmp/docker-test-output.txt
+          echo ""
+
+          # Verify we got output
+          if [ ! -s /tmp/docker-test-output.txt ]; then
+            echo "❌ ERROR: No output from container"
+            exit 1
+          fi
+
+          # Verify error message contains "error" keyword
+          if ! grep -qi "error" /tmp/docker-test-output.txt; then
+            echo "❌ ERROR: Expected error message not found"
+            exit 1
+          fi
+
+          # Verify error is about configuration
+          if ! grep -Ei "discord_token|webhook_url|configuration|environment|variable|missing" /tmp/docker-test-output.txt; then
+            echo "❌ ERROR: Expected configuration-related error message"
+            exit 1
+          fi
+
+          echo "✓ Docker image smoke test passed"
+          echo "  - Binary executes and produces output"
+          echo "  - Error handling works correctly"

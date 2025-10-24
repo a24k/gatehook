@@ -1,4 +1,4 @@
-name: Check and Test
+name: CI - Rust Check and Test
 
 on: pull_request
 
@@ -13,7 +13,7 @@ env:
 
 jobs:
   check-and-test:
-    name: cargo check, clippy, test
+    name: Rust check, clippy, and test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
