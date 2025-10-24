@@ -34,29 +34,23 @@ RUN apt-get update && apt-get install -y wget xz-utils && \
 RUN cargo install cargo-zigbuild && \
     rustup target add $(cat /tmp/rust_target.txt)
 
-# Build dependencies (using dummy main.rs for caching)
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs && \
-    cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
-    rm -rf src && \
-    rm -f ./target/$(cat /tmp/rust_target.txt)/release/gatehook
-
 # Build application
+# Note: We rely on --mount=type=cache for dependency caching instead of dummy builds
+# to avoid issues with incremental compilation and stale binaries
+COPY Cargo.toml Cargo.lock ./
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
-    cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook && \
-    # Verify the binary is valid
-    test -f ./target/release/gatehook && \
-    test $(stat -c%s ./target/release/gatehook) -gt 1000000 && \
+    cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./gatehook && \
     echo "✓ Built binary successfully:" && \
-    ls -lh ./target/release/gatehook
+    ls -lh ./gatehook
 
 # Runtime stage: distroless static (for statically-linked binaries)
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 
-COPY --from=builder /app/target/release/gatehook /app/gatehook
+COPY --from=builder /app/gatehook /app/gatehook
 WORKDIR /app
 
 ENTRYPOINT ["/app/gatehook"]
