@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG RUST_VERSION=1.85
+ARG RUST_VERSION=1.90
 ARG APP_NAME=gatehook
 
 # cargo-chefを使った依存関係キャッシング
