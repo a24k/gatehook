@@ -44,6 +44,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: build
         with:
           file: Dockerfile
           context: .
@@ -55,3 +56,38 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          # Load image for testing (only for single-platform builds)
+          load: ${{ github.event_name == 'pull_request' }}
+
+      # Test that the binary starts correctly (PR builds only, since multi-platform can't be loaded)
+      - name: Test Docker image startup
+        if: github.event_name == 'pull_request'
+        run: |
+          # Extract the first tag for testing
+          TEST_TAG=$(echo "${{ steps.metadata.outputs.tags }}" | head -n1)
+          echo "Testing image: $TEST_TAG"
+
+          # Test 1: Verify binary exists and is executable
+          docker run --rm --entrypoint /bin/sh "$TEST_TAG" -c "test -x /app/gatehook && echo 'Binary is executable'"
+
+          # Test 2: Run with missing env vars - should fail gracefully with error message
+          # Using timeout to ensure it doesn't hang, and checking exit code
+          set +e
+          timeout 10s docker run --rm "$TEST_TAG" 2>&1 | tee /tmp/docker-test-output.txt
+          EXIT_CODE=$?
+          set -e
+
+          # Should exit with error (non-zero) when env vars are missing
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "ERROR: Application should have failed without required environment variables"
+            exit 1
+          fi
+
+          # Verify error message contains expected text about configuration
+          if ! grep -qi "configuration\|discord_token\|webhook_url" /tmp/docker-test-output.txt; then
+            echo "ERROR: Expected configuration error message not found"
+            cat /tmp/docker-test-output.txt
+            exit 1
+          fi
+
+          echo "✓ Docker image startup test passed"
