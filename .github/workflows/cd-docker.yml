@@ -55,5 +55,3 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-          # Disable provenance attestation for faster builds
-          provenance: false
