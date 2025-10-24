@@ -39,23 +39,40 @@ jobs:
         run: |
           echo "Testing image: gatehook:test"
 
+          # Debug: Check image details
+          echo "=== Image Information ==="
+          docker images gatehook:test
+          docker inspect gatehook:test | grep -A 5 "Entrypoint\|Cmd"
+
+          echo ""
+          echo "=== Running container ==="
           # Run binary without env vars - should produce error output
           # This verifies: 1) binary executes, 2) logging works, 3) error handling works
-          echo "Running binary (will fail due to missing env vars, which is expected)..."
           set +e
-          timeout 5s docker run --rm gatehook:test 2>&1 | tee /tmp/docker-test-output.txt
+          docker run --rm gatehook:test 2>&1 | tee /tmp/docker-test-output.txt
           EXIT_CODE=$?
           set -e
 
           echo ""
+          echo "=== Test Results ==="
           echo "Exit code: $EXIT_CODE"
-          echo "Output:"
+          echo "Output size: $(wc -c < /tmp/docker-test-output.txt) bytes"
+          echo "Output lines: $(wc -l < /tmp/docker-test-output.txt)"
+          echo ""
+          echo "Output content:"
           cat /tmp/docker-test-output.txt
+          echo ""
+          echo "Output (hex dump, first 200 bytes):"
+          head -c 200 /tmp/docker-test-output.txt | xxd || true
           echo ""
 
           # Check that we got some output
           if [ ! -s /tmp/docker-test-output.txt ]; then
             echo "ERROR: No output from container - binary may not have executed"
+            echo "This could mean:"
+            echo "  - Binary doesn't exist at ENTRYPOINT path"
+            echo "  - Binary fails silently without output"
+            echo "  - Output is being lost somewhere"
             exit 1
           fi
 
