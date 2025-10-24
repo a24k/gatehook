@@ -38,8 +38,7 @@ jobs:
         with:
           file: Dockerfile
           context: .
-          # Build both platforms for production
-          # Use cargo-zigbuild for all platforms (arm64 is cross-compiled for speed)
+          # Build for both platforms using cargo-zigbuild cross-compilation
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
