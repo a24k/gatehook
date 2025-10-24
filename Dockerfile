@@ -1,13 +1,11 @@
 # syntax=docker/dockerfile:1
 
 ARG RUST_VERSION=1.90
-ARG APP_NAME=gatehook
 
 # Build stage with cross-compilation support
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-bookworm AS builder
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-ARG APP_NAME
 
 WORKDIR /app
 
@@ -47,10 +45,10 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
-    cp ./target/$(cat /tmp/rust_target.txt)/release/${APP_NAME} /bin/server
+    cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook
 
 # Runtime stage: distroless
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
-COPY --from=builder /bin/server /app/gatehook
+COPY --from=builder /app/target/release/gatehook /app/gatehook
 WORKDIR /app
 ENTRYPOINT ["/app/gatehook"]
