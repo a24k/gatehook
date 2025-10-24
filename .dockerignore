@@ -1,0 +1,33 @@
+# Build artifacts
+target/
+
+# Git repository
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+tests/
+
+# macOS
+.DS_Store
