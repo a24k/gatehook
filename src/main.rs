@@ -51,10 +51,10 @@ impl EventHandler for Handler {
             "Received message"
         );
 
-        if message.content == "Ping!"
-            && let Err(why) = message.reply(&ctx.http, "Pong!").await
-        {
-            error!(error = ?why, "Failed to send message reply");
+        if message.content == "Ping!" {
+            if let Err(why) = message.reply(&ctx.http, "Pong!").await {
+                error!(error = ?why, "Failed to send message reply");
+            }
         }
 
         // Send message to webhook endpoint
