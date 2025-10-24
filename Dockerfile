@@ -32,5 +32,4 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 COPY --from=builder /bin/server /app/gatehook
 WORKDIR /app
-EXPOSE 8000
 ENTRYPOINT ["/app/gatehook"]
