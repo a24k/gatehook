@@ -47,8 +47,22 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
     cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook
 
-# Runtime stage: distroless
-FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+# Runtime stage: use debian-slim for better compatibility
+FROM debian:bookworm-slim AS runtime
+
+# Install CA certificates and minimal runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 65532 nonroot
+
 COPY --from=builder /app/target/release/gatehook /app/gatehook
 WORKDIR /app
+
+# Run as non-root user
+USER nonroot
+
 ENTRYPOINT ["/app/gatehook"]
