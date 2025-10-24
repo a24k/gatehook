@@ -59,7 +59,12 @@ jobs:
           # Load image for testing (only for single-platform builds)
           load: ${{ github.event_name == 'pull_request' }}
 
-      # Test that the binary starts correctly (PR builds only, since multi-platform can't be loaded)
+      # Smoke test: Verify the Docker image can execute the binary
+      # This catches Dockerfile configuration issues like:
+      # - Incorrect ENTRYPOINT path
+      # - Binary not copied to correct location
+      # - File permission issues
+      # Note: With musl static linking, runtime dependency issues are not expected
       - name: Test Docker image startup
         if: github.event_name == 'pull_request'
         run: |
@@ -67,15 +72,14 @@ jobs:
           TEST_TAG=$(echo "${{ steps.metadata.outputs.tags }}" | head -n1)
           echo "Testing image: $TEST_TAG"
 
-          # Test: Run with missing env vars - should fail gracefully with error message
-          # Using timeout to ensure it doesn't hang, and checking exit code
-          # Note: distroless doesn't have shell, so we test the binary directly
+          # Run binary without env vars - should fail gracefully with error message
+          # This verifies: 1) binary executes, 2) error handling works
           set +e
           timeout 10s docker run --rm "$TEST_TAG" 2>&1 | tee /tmp/docker-test-output.txt
           EXIT_CODE=$?
           set -e
 
-          # Should exit with error (non-zero or timeout) when env vars are missing
+          # Should exit with error (non-zero) when env vars are missing
           if [ $EXIT_CODE -eq 0 ]; then
             echo "ERROR: Application should have failed without required environment variables"
             exit 1
@@ -89,5 +93,5 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Docker image startup test passed"
-          echo "  - Binary executed and failed gracefully without env vars"
+          echo "✓ Docker image smoke test passed"
+          echo "  - Binary is executable and reports configuration errors correctly"
