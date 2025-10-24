@@ -45,7 +45,13 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
-    cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook
+    echo "=== Build completed ===" && \
+    ls -lh ./target/$(cat /tmp/rust_target.txt)/release/gatehook && \
+    file ./target/$(cat /tmp/rust_target.txt)/release/gatehook && \
+    cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook && \
+    echo "=== Binary copied ===" && \
+    ls -lh ./target/release/gatehook && \
+    file ./target/release/gatehook
 
 # Runtime stage: distroless static (for statically-linked binaries)
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime

@@ -45,6 +45,30 @@ jobs:
           docker inspect gatehook:test | grep -A 5 "Entrypoint\|Cmd"
 
           echo ""
+          echo "=== Checking binary in container ==="
+          # Since distroless/static has no shell, we can't easily inspect
+          # But we can try to copy the binary out and check it
+          docker create --name gatehook-temp gatehook:test
+          docker cp gatehook-temp:/app/gatehook /tmp/gatehook-binary || echo "Failed to copy binary"
+          docker rm gatehook-temp
+
+          if [ -f /tmp/gatehook-binary ]; then
+            echo "Binary exists and was copied successfully"
+            ls -lh /tmp/gatehook-binary
+            file /tmp/gatehook-binary
+            ldd /tmp/gatehook-binary 2>&1 || echo "(static binary - ldd not applicable)"
+
+            # Try running it directly
+            echo ""
+            echo "=== Running binary directly on host ==="
+            set +e
+            /tmp/gatehook-binary 2>&1 | head -20
+            DIRECT_EXIT=$?
+            set -e
+            echo "Direct execution exit code: $DIRECT_EXIT"
+          fi
+
+          echo ""
           echo "=== Running container ==="
           # Run binary without env vars - should produce error output
           # This verifies: 1) binary executes, 2) logging works, 3) error handling works
