@@ -1,4 +1,4 @@
-name: Auto Tag on Merge
+name: CD - Auto Tag on Merge
 
 on:
   push:
