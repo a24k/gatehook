@@ -102,8 +102,6 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt()
-        .with_writer(std::io::stdout)
-        .with_ansi(false)
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive(tracing::Level::INFO.into()),
