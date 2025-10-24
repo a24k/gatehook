@@ -97,6 +97,9 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load environment variables from .env file if it exists
+    let _ = dotenvy::dotenv();
+
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt()
         .with_env_filter(
