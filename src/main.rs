@@ -108,6 +108,14 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    // Display startup banner with version information
+    info!(
+        name = env!("CARGO_PKG_NAME"),
+        version = env!("CARGO_PKG_VERSION"),
+        description = env!("CARGO_PKG_DESCRIPTION"),
+        "Starting application"
+    );
+
     let params = params::Params::new()?;
     info!(?params, "Application parameters loaded");
 
