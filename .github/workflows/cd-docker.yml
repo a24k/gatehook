@@ -67,17 +67,15 @@ jobs:
           TEST_TAG=$(echo "${{ steps.metadata.outputs.tags }}" | head -n1)
           echo "Testing image: $TEST_TAG"
 
-          # Test 1: Verify binary exists and is executable
-          docker run --rm --entrypoint /bin/sh "$TEST_TAG" -c "test -x /app/gatehook && echo 'Binary is executable'"
-
-          # Test 2: Run with missing env vars - should fail gracefully with error message
+          # Test: Run with missing env vars - should fail gracefully with error message
           # Using timeout to ensure it doesn't hang, and checking exit code
+          # Note: distroless doesn't have shell, so we test the binary directly
           set +e
           timeout 10s docker run --rm "$TEST_TAG" 2>&1 | tee /tmp/docker-test-output.txt
           EXIT_CODE=$?
           set -e
 
-          # Should exit with error (non-zero) when env vars are missing
+          # Should exit with error (non-zero or timeout) when env vars are missing
           if [ $EXIT_CODE -eq 0 ]; then
             echo "ERROR: Application should have failed without required environment variables"
             exit 1
@@ -86,8 +84,10 @@ jobs:
           # Verify error message contains expected text about configuration
           if ! grep -qi "configuration\|discord_token\|webhook_url" /tmp/docker-test-output.txt; then
             echo "ERROR: Expected configuration error message not found"
+            echo "Exit code was: $EXIT_CODE"
             cat /tmp/docker-test-output.txt
             exit 1
           fi
 
           echo "✓ Docker image startup test passed"
+          echo "  - Binary executed and failed gracefully without env vars"

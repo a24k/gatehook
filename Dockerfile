@@ -9,15 +9,15 @@ ARG BUILDPLATFORM
 
 WORKDIR /app
 
-# Set Rust and Zig targets based on target platform
+# Set Rust and Zig targets based on target platform (using musl for static linking)
 RUN case "$TARGETPLATFORM" in \
     "linux/arm64") \
-        echo "aarch64-unknown-linux-gnu" > /tmp/rust_target.txt && \
-        echo "aarch64-linux-gnu" > /tmp/zig_target.txt \
+        echo "aarch64-unknown-linux-musl" > /tmp/rust_target.txt && \
+        echo "aarch64-linux-musl" > /tmp/zig_target.txt \
         ;; \
     "linux/amd64") \
-        echo "x86_64-unknown-linux-gnu" > /tmp/rust_target.txt && \
-        echo "x86_64-linux-gnu" > /tmp/zig_target.txt \
+        echo "x86_64-unknown-linux-musl" > /tmp/rust_target.txt && \
+        echo "x86_64-linux-musl" > /tmp/zig_target.txt \
         ;; \
     *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
     esac
@@ -47,22 +47,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
     cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook
 
-# Runtime stage: use debian-slim for better compatibility
-FROM debian:bookworm-slim AS runtime
-
-# Install CA certificates and minimal runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -u 65532 nonroot
+# Runtime stage: distroless static (for statically-linked binaries)
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 
 COPY --from=builder /app/target/release/gatehook /app/gatehook
 WORKDIR /app
-
-# Run as non-root user
-USER nonroot
 
 ENTRYPOINT ["/app/gatehook"]
