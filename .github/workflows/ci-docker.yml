@@ -33,35 +33,48 @@ jobs:
       # - Incorrect ENTRYPOINT path
       # - Binary not copied to correct location
       # - File permission issues
+      # - Logging system not working
       # Note: With musl static linking, runtime dependency issues are not expected
       - name: Test Docker image startup
         run: |
           echo "Testing image: gatehook:test"
 
-          # Run binary - just verify it can start
-          # We don't check the exit code or error messages, just that the binary executes
-          echo "Attempting to run binary (will fail due to missing env vars, which is expected)..."
+          # Run binary without env vars - should produce error output
+          # This verifies: 1) binary executes, 2) logging works, 3) error handling works
+          echo "Running binary (will fail due to missing env vars, which is expected)..."
           set +e
           timeout 5s docker run --rm gatehook:test 2>&1 | tee /tmp/docker-test-output.txt
           EXIT_CODE=$?
           set -e
 
+          echo ""
           echo "Exit code: $EXIT_CODE"
           echo "Output:"
           cat /tmp/docker-test-output.txt
+          echo ""
 
-          # Exit code 124 means timeout (binary is running but waiting for network, etc.)
-          # Exit code 1-127 means binary executed and exited with error (expected without env vars)
-          # Exit code 0 would mean success (unexpected without env vars, but we don't fail on this)
-          # Exit code 126 means cannot execute (permission issue - FAIL)
-          # Exit code 127 means command not found (path issue - FAIL)
-          if [ $EXIT_CODE -eq 126 ]; then
-            echo "ERROR: Binary cannot be executed (permission issue)"
+          # Check that we got some output
+          if [ ! -s /tmp/docker-test-output.txt ]; then
+            echo "ERROR: No output from container - binary may not have executed"
             exit 1
-          elif [ $EXIT_CODE -eq 127 ]; then
-            echo "ERROR: Binary not found (ENTRYPOINT path issue)"
+          fi
+
+          # Check for error message about missing configuration
+          # The application should output an error about missing DISCORD_TOKEN or WEBHOOK_URL
+          if ! grep -qi "error" /tmp/docker-test-output.txt; then
+            echo "ERROR: Expected error message not found in output"
+            echo "The application should report configuration errors when env vars are missing"
+            exit 1
+          fi
+
+          # Verify the error is related to configuration/environment variables
+          if ! grep -Ei "discord_token|webhook_url|configuration|environment|variable|missing" /tmp/docker-test-output.txt; then
+            echo "ERROR: Output doesn't mention expected configuration fields"
+            echo "Expected keywords: discord_token, webhook_url, configuration, environment, variable, or missing"
             exit 1
           fi
 
           echo "✓ Docker image smoke test passed"
-          echo "  - Binary exists and is executable (exit code: $EXIT_CODE)"
+          echo "  - Binary executed successfully"
+          echo "  - Logging system is working"
+          echo "  - Error handling is working correctly"
