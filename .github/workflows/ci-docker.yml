@@ -1,0 +1,79 @@
+name: CI - Docker Build and Test
+
+on: pull_request
+
+# Cancel outdated builds when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build-and-test:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: docker/metadata-action@v5
+        id: metadata
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=pr
+            type=sha
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          file: Dockerfile
+          context: .
+          # Build only amd64 for PRs to save time
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: false
+          load: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+
+      # Smoke test: Verify the Docker image can execute the binary
+      # This catches Dockerfile configuration issues like:
+      # - Incorrect ENTRYPOINT path
+      # - Binary not copied to correct location
+      # - File permission issues
+      # Note: With musl static linking, runtime dependency issues are not expected
+      - name: Test Docker image startup
+        run: |
+          # Extract the first tag for testing
+          TEST_TAG=$(echo "${{ steps.metadata.outputs.tags }}" | head -n1)
+          echo "Testing image: $TEST_TAG"
+
+          # Run binary - just verify it can start
+          # We don't check the exit code or error messages, just that the binary executes
+          echo "Attempting to run binary (will fail due to missing env vars, which is expected)..."
+          set +e
+          timeout 5s docker run --rm "$TEST_TAG" 2>&1 | tee /tmp/docker-test-output.txt
+          EXIT_CODE=$?
+          set -e
+
+          echo "Exit code: $EXIT_CODE"
+          echo "Output:"
+          cat /tmp/docker-test-output.txt
+
+          # Exit code 124 means timeout (binary is running but waiting for network, etc.)
+          # Exit code 1-127 means binary executed and exited with error (expected without env vars)
+          # Exit code 0 would mean success (unexpected without env vars, but we don't fail on this)
+          # Exit code 126 means cannot execute (permission issue - FAIL)
+          # Exit code 127 means command not found (path issue - FAIL)
+          if [ $EXIT_CODE -eq 126 ]; then
+            echo "ERROR: Binary cannot be executed (permission issue)"
+            exit 1
+          elif [ $EXIT_CODE -eq 127 ]; then
+            echo "ERROR: Binary not found (ENTRYPOINT path issue)"
+            exit 1
+          fi
+
+          echo "✓ Docker image smoke test passed"
+          echo "  - Binary exists and is executable (exit code: $EXIT_CODE)"

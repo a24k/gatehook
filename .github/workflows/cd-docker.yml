@@ -1,4 +1,4 @@
-name: Build Docker
+name: CD - Docker Build and Push
 
 on:
   push:
@@ -6,16 +6,10 @@ on:
       - "main"
     tags:
       - "v*.*.*"
-  pull_request:
-
-# Cancel outdated builds when new commits are pushed
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  build:
-    name: docker build
+  build-and-push:
+    name: Docker build and push
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +23,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
@@ -38,60 +31,19 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
-        id: build
         with:
           file: Dockerfile
           context: .
-          # Build only amd64 for PRs to save time, both platforms for main/tags
+          # Build both platforms for production
           # Use cargo-zigbuild for all platforms (arm64 is cross-compiled for speed)
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-          # Load image for testing (only for single-platform builds)
-          load: ${{ github.event_name == 'pull_request' }}
-
-      # Smoke test: Verify the Docker image can execute the binary
-      # This catches Dockerfile configuration issues like:
-      # - Incorrect ENTRYPOINT path
-      # - Binary not copied to correct location
-      # - File permission issues
-      # Note: With musl static linking, runtime dependency issues are not expected
-      - name: Test Docker image startup
-        if: github.event_name == 'pull_request'
-        run: |
-          # Extract the first tag for testing
-          TEST_TAG=$(echo "${{ steps.metadata.outputs.tags }}" | head -n1)
-          echo "Testing image: $TEST_TAG"
-
-          # Run binary without env vars - should fail gracefully with error message
-          # This verifies: 1) binary executes, 2) error handling works
-          set +e
-          timeout 10s docker run --rm "$TEST_TAG" 2>&1 | tee /tmp/docker-test-output.txt
-          EXIT_CODE=$?
-          set -e
-
-          # Should exit with error (non-zero) when env vars are missing
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "ERROR: Application should have failed without required environment variables"
-            exit 1
-          fi
-
-          # Verify error message contains expected text about configuration
-          if ! grep -qi "configuration\|discord_token\|webhook_url" /tmp/docker-test-output.txt; then
-            echo "ERROR: Expected configuration error message not found"
-            echo "Exit code was: $EXIT_CODE"
-            cat /tmp/docker-test-output.txt
-            exit 1
-          fi
-
-          echo "✓ Docker image smoke test passed"
-          echo "  - Binary is executable and reports configuration errors correctly"
