@@ -38,7 +38,8 @@ RUN cargo install cargo-zigbuild && \
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
-    rm -rf src
+    rm -rf src && \
+    rm -f ./target/$(cat /tmp/rust_target.txt)/release/gatehook
 
 # Build application
 COPY . .
@@ -46,7 +47,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
     cp ./target/$(cat /tmp/rust_target.txt)/release/gatehook ./target/release/gatehook && \
-    echo "Built binary:" && \
+    # Verify the binary is valid
+    test -f ./target/release/gatehook && \
+    test $(stat -c%s ./target/release/gatehook) -gt 1000000 && \
+    echo "✓ Built binary successfully:" && \
     ls -lh ./target/release/gatehook
 
 # Runtime stage: distroless static (for statically-linked binaries)
