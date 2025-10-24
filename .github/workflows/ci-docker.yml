@@ -37,85 +37,37 @@ jobs:
       # Note: With musl static linking, runtime dependency issues are not expected
       - name: Test Docker image startup
         run: |
-          echo "Testing image: gatehook:test"
+          echo "=== Running Docker smoke test ==="
 
-          # Debug: Check image details
-          echo "=== Image Information ==="
-          docker images gatehook:test
-          docker inspect gatehook:test | grep -A 5 "Entrypoint\|Cmd"
-
-          echo ""
-          echo "=== Checking binary in container ==="
-          # Since distroless/static has no shell, we can't easily inspect
-          # But we can try to copy the binary out and check it
-          docker create --name gatehook-temp gatehook:test
-          docker cp gatehook-temp:/app/gatehook /tmp/gatehook-binary || echo "Failed to copy binary"
-          docker rm gatehook-temp
-
-          if [ -f /tmp/gatehook-binary ]; then
-            echo "Binary exists and was copied successfully"
-            ls -lh /tmp/gatehook-binary
-            file /tmp/gatehook-binary
-            ldd /tmp/gatehook-binary 2>&1 || echo "(static binary - ldd not applicable)"
-
-            # Try running it directly
-            echo ""
-            echo "=== Running binary directly on host ==="
-            set +e
-            /tmp/gatehook-binary 2>&1 | head -20
-            DIRECT_EXIT=$?
-            set -e
-            echo "Direct execution exit code: $DIRECT_EXIT"
-          fi
-
-          echo ""
-          echo "=== Running container ==="
           # Run binary without env vars - should produce error output
           # This verifies: 1) binary executes, 2) logging works, 3) error handling works
-          set +e
           docker run --rm gatehook:test 2>&1 | tee /tmp/docker-test-output.txt
           EXIT_CODE=$?
-          set -e
 
           echo ""
-          echo "=== Test Results ==="
           echo "Exit code: $EXIT_CODE"
-          echo "Output size: $(wc -c < /tmp/docker-test-output.txt) bytes"
-          echo "Output lines: $(wc -l < /tmp/docker-test-output.txt)"
-          echo ""
-          echo "Output content:"
+          echo "Output:"
           cat /tmp/docker-test-output.txt
           echo ""
-          echo "Output (hex dump, first 200 bytes):"
-          head -c 200 /tmp/docker-test-output.txt | xxd || true
-          echo ""
 
-          # Check that we got some output
+          # Verify we got output
           if [ ! -s /tmp/docker-test-output.txt ]; then
-            echo "ERROR: No output from container - binary may not have executed"
-            echo "This could mean:"
-            echo "  - Binary doesn't exist at ENTRYPOINT path"
-            echo "  - Binary fails silently without output"
-            echo "  - Output is being lost somewhere"
+            echo "❌ ERROR: No output from container"
             exit 1
           fi
 
-          # Check for error message about missing configuration
-          # The application should output an error about missing DISCORD_TOKEN or WEBHOOK_URL
+          # Verify error message contains "error" keyword
           if ! grep -qi "error" /tmp/docker-test-output.txt; then
-            echo "ERROR: Expected error message not found in output"
-            echo "The application should report configuration errors when env vars are missing"
+            echo "❌ ERROR: Expected error message not found"
             exit 1
           fi
 
-          # Verify the error is related to configuration/environment variables
+          # Verify error is about configuration
           if ! grep -Ei "discord_token|webhook_url|configuration|environment|variable|missing" /tmp/docker-test-output.txt; then
-            echo "ERROR: Output doesn't mention expected configuration fields"
-            echo "Expected keywords: discord_token, webhook_url, configuration, environment, variable, or missing"
+            echo "❌ ERROR: Expected configuration-related error message"
             exit 1
           fi
 
           echo "✓ Docker image smoke test passed"
-          echo "  - Binary executed successfully"
-          echo "  - Logging system is working"
-          echo "  - Error handling is working correctly"
+          echo "  - Binary executes and produces output"
+          echo "  - Error handling works correctly"
