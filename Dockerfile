@@ -3,7 +3,7 @@
 ARG RUST_VERSION=1.90
 ARG APP_NAME=gatehook
 
-# クロスコンパイル対応のビルドステージ
+# Build stage with cross-compilation support
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-bookworm AS builder
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -11,7 +11,7 @@ ARG APP_NAME
 
 WORKDIR /app
 
-# ターゲットプラットフォームに応じたRustターゲットとZigターゲットを設定
+# Set Rust and Zig targets based on target platform
 RUN case "$TARGETPLATFORM" in \
     "linux/arm64") \
         echo "aarch64-unknown-linux-gnu" > /tmp/rust_target.txt && \
@@ -24,7 +24,7 @@ RUN case "$TARGETPLATFORM" in \
     *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
     esac
 
-# Zigのインストール（クロスコンパイル用リンカー）
+# Install Zig (cross-compilation linker)
 RUN apt-get update && apt-get install -y wget xz-utils && \
     wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz && \
     tar -xf zig-linux-x86_64-0.11.0.tar.xz -C /usr/local && \
@@ -32,24 +32,24 @@ RUN apt-get update && apt-get install -y wget xz-utils && \
     rm zig-linux-x86_64-0.11.0.tar.xz && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# cargo-zigbuildのインストールとRustターゲットの追加
+# Install cargo-zigbuild and add Rust target
 RUN cargo install cargo-zigbuild && \
     rustup target add $(cat /tmp/rust_target.txt)
 
-# 依存関係のビルド（recipe.json方式）
+# Build dependencies (using dummy main.rs for caching)
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
     rm -rf src
 
-# アプリケーションのビルド
+# Build application
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo zigbuild --release --target $(cat /tmp/rust_target.txt) && \
     cp ./target/$(cat /tmp/rust_target.txt)/release/${APP_NAME} /bin/server
 
-# 本番ステージ：distroless
+# Runtime stage: distroless
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 COPY --from=builder /bin/server /app/gatehook
 WORKDIR /app
