@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -10,6 +11,6 @@ pub struct Params {
 
 impl Params {
     pub fn new() -> anyhow::Result<Params> {
-        envy::from_env::<Params>().map_err(|e| anyhow::anyhow!("Failed to load configuration: {}", e))
+        envy::from_env::<Params>().context("Failed to load configuration")
     }
 }
