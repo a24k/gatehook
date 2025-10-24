@@ -101,10 +101,11 @@ async fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
 
     // Initialize tracing subscriber for structured logging
+    // Default: gatehook=info, serenity=warn (suppress serenity's normal operation logs)
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "gatehook=info,serenity=warn".into()),
         )
         .init();
 
