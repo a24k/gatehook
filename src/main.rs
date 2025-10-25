@@ -1,4 +1,5 @@
 mod params;
+pub mod webhook;
 
 use anyhow::Context as _;
 use tracing::{debug, error, info};
@@ -10,21 +11,17 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler {
-    webhook_url: String,
-    httpclient: reqwest::Client,
+    webhook_client: webhook::WebhookClient,
 }
 
 impl Handler {
     fn new(params: &params::Params) -> anyhow::Result<Handler> {
-        let httpclient = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(params.insecure_mode)
-            .build()
-            .context("Building HTTP Client")?;
+        let webhook_client = webhook::WebhookClient::new(
+            params.webhook_url.clone(),
+            params.insecure_mode,
+        )?;
 
-        Ok(Handler {
-            webhook_url: params.webhook_url.clone(),
-            httpclient,
-        })
+        Ok(Handler { webhook_client })
     }
 }
 
@@ -40,7 +37,7 @@ impl EventHandler for Handler {
             "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
             ready.application.id
         );
-        info!(webhook_url = %self.webhook_url, "Webhook configured");
+        info!(webhook_url = %self.webhook_client.webhook_url(), "Webhook configured");
     }
 
     async fn message(&self, ctx: Context, message: Message) {
@@ -58,31 +55,9 @@ impl EventHandler for Handler {
         }
 
         // Send message to webhook endpoint
-        let res = self
-            .httpclient
-            .post(&self.webhook_url)
-            .query(&[("handler", "message")])
-            .json(&message)
-            .send()
+        self.webhook_client
+            .send_with_logging("message", &message, &message.id.to_string())
             .await;
-
-        match res {
-            Ok(response) => {
-                info!(
-                    status = %response.status(),
-                    message_id = %message.id,
-                    "Successfully sent message to webhook"
-                );
-            }
-            Err(err) => {
-                error!(
-                    error = ?err,
-                    message_id = %message.id,
-                    webhook_url = %self.webhook_url,
-                    "Failed to send message to webhook"
-                );
-            }
-        }
     }
 
     async fn reaction_add(&self, _: Context, reaction: Reaction) {

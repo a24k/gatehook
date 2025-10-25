@@ -6,6 +6,10 @@ description = "Convert events on Discord's Gateway (WebSocket API) to simple Web
 edition = "2024"
 license = "MIT"
 
+[lib]
+name = "gatehook"
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = "1.0"
 dotenvy = "0.15"
