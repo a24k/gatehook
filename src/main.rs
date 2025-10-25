@@ -33,11 +33,9 @@ impl EventHandler for Handler {
             "Bot is connected"
         );
         info!(
-            client_id = %ready.application.id,
-            "Install URL: https://discord.com/oauth2/authorize?client_id={}&scope=bot",
-            ready.application.id
+            install_url = %format!("https://discord.com/oauth2/authorize?client_id={}&scope=bot", ready.application.id),
+            "Bot install URL available"
         );
-        info!(webhook_url = %self.webhook_client.webhook_url(), "Webhook configured");
     }
 
     async fn message(&self, ctx: Context, message: Message) {
