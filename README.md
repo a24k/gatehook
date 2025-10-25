@@ -1,7 +1,7 @@
 
 # gatehook
 
-Convert events on Discord's Gateway (WebSocket API) to simple Webhook events.
+Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 
 ## Environment Variables
 
