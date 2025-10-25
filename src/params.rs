@@ -1,7 +1,7 @@
 use anyhow::Context as _;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct Params {
     #[serde(default)]
     pub insecure_mode: bool,
@@ -9,8 +9,83 @@ pub struct Params {
     pub webhook_url: String,
 }
 
+/// Mask sensitive strings by showing only first and last few characters
+fn mask_token(s: &str) -> String {
+    const VISIBLE_CHARS: usize = 4;
+
+    if s.len() <= VISIBLE_CHARS * 2 {
+        // If string is too short, mask everything except first char
+        if s.is_empty() {
+            return "<empty>".to_string();
+        }
+        return format!("{}***", &s[..1]);
+    }
+
+    format!(
+        "{}***{}",
+        &s[..VISIBLE_CHARS],
+        &s[s.len() - VISIBLE_CHARS..]
+    )
+}
+
+impl std::fmt::Debug for Params {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Params")
+            .field("insecure_mode", &self.insecure_mode)
+            .field("discord_token", &mask_token(&self.discord_token))
+            .field("webhook_url", &self.webhook_url)
+            .finish()
+    }
+}
+
 impl Params {
     pub fn new() -> anyhow::Result<Params> {
         envy::from_env::<Params>().context("Failed to load configuration")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mask_token_long_string() {
+        let token = "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5";
+        let masked = mask_token(token);
+        assert_eq!(masked, "MTEx***OTk5");
+    }
+
+    #[test]
+    fn test_mask_token_short_string() {
+        let token = "short";
+        let masked = mask_token(token);
+        assert_eq!(masked, "s***");
+    }
+
+    #[test]
+    fn test_mask_token_empty_string() {
+        let token = "";
+        let masked = mask_token(token);
+        assert_eq!(masked, "<empty>");
+    }
+
+    #[test]
+    fn test_params_debug_masks_sensitive_data() {
+        let params = Params {
+            insecure_mode: false,
+            discord_token: "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5".to_string(),
+            webhook_url: "https://example.com/webhook/secret123456".to_string(),
+        };
+
+        let debug_output = format!("{:?}", params);
+
+        // Should contain masked discord_token
+        assert!(debug_output.contains("MTEx***OTk5"));
+
+        // Should NOT contain full discord_token
+        assert!(!debug_output.contains("MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5"));
+
+        // webhook_url should be visible (not masked)
+        assert!(debug_output.contains("https://example.com/webhook/secret123456"));
     }
 }
