@@ -1,12 +1,12 @@
-mod logic;
+mod adapters;
+mod bridge;
 mod params;
-mod services;
 pub mod webhook;
 
 use anyhow::Context as _;
-use logic::event_bridge::EventBridge;
-use services::discord::SerenityDiscordService;
-use services::event_sender::HttpEventSender;
+use adapters::discord::SerenityDiscordService;
+use adapters::event_sender::HttpEventSender;
+use bridge::event_bridge::EventBridge;
 use std::sync::Arc;
 use tracing::{error, info};
 

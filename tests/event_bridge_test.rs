@@ -1,9 +1,9 @@
 // Unit tests for EventBridge business logic
 // These tests verify that events are correctly processed and forwarded
 
-use gatehook::logic::event_bridge::EventBridge;
-use gatehook::services::discord::test_helpers::MockDiscordService;
-use gatehook::services::event_sender::test_helpers::MockEventSender;
+use gatehook::adapters::discord::test_helpers::MockDiscordService;
+use gatehook::adapters::event_sender::test_helpers::MockEventSender;
+use gatehook::bridge::event_bridge::EventBridge;
 use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, MessageId};
 use serenity::model::user::User;
