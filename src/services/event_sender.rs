@@ -1,0 +1,178 @@
+use anyhow::Context as _;
+use serde::Serialize;
+use serenity::async_trait;
+use tracing::{error, info};
+
+/// イベントを外部エンドポイントに送信するインターフェース
+#[async_trait]
+pub trait EventSender: Send + Sync {
+    /// Send an event to the endpoint
+    ///
+    /// # Arguments
+    ///
+    /// * `handler` - The handler name (e.g., "message", "reaction_add")
+    /// * `payload` - The payload to send (will be serialized as JSON)
+    async fn send<T: Serialize + Send + Sync>(
+        &self,
+        handler: &str,
+        payload: &T,
+    ) -> anyhow::Result<()>;
+}
+
+/// HTTP経由でイベントを送信する実装
+pub struct HttpEventSender {
+    client: reqwest::Client,
+    webhook_url: String,
+}
+
+impl HttpEventSender {
+    /// Create a new HttpEventSender
+    ///
+    /// # Arguments
+    ///
+    /// * `webhook_url` - The URL of the webhook endpoint
+    /// * `insecure_mode` - If true, accept invalid TLS certificates
+    pub fn new(webhook_url: String, insecure_mode: bool) -> anyhow::Result<Self> {
+        let client = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(insecure_mode)
+            .build()
+            .context("Building HTTP Client")?;
+
+        Ok(Self {
+            client,
+            webhook_url,
+        })
+    }
+
+    /// Get the webhook URL
+    pub fn webhook_url(&self) -> &str {
+        &self.webhook_url
+    }
+
+    /// Send a payload to the webhook endpoint (low-level)
+    ///
+    /// # Arguments
+    ///
+    /// * `handler` - The handler name (e.g., "message", "reaction")
+    /// * `payload` - The payload to send (will be serialized as JSON)
+    async fn send_request<T: Serialize>(
+        &self,
+        handler: &str,
+        payload: &T,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        self.client
+            .post(&self.webhook_url)
+            .query(&[("handler", handler)])
+            .json(payload)
+            .send()
+            .await
+    }
+}
+
+#[async_trait]
+impl EventSender for HttpEventSender {
+    async fn send<T: Serialize + Send + Sync>(
+        &self,
+        handler: &str,
+        payload: &T,
+    ) -> anyhow::Result<()> {
+        match self.send_request(handler, payload).await {
+            Ok(response) => {
+                info!(
+                    status = %response.status(),
+                    handler = %handler,
+                    "Successfully sent event to webhook"
+                );
+                Ok(())
+            }
+            Err(err) => {
+                error!(
+                    error = ?err,
+                    handler = %handler,
+                    webhook_url = %self.webhook_url,
+                    "Failed to send event to webhook"
+                );
+                Err(err.into())
+            }
+        }
+    }
+}
+
+/// Test用のモック実装とヘルパー
+pub mod test_helpers {
+    use super::*;
+    use serde_json;
+    use std::sync::{Arc, Mutex};
+
+    pub struct MockEventSender {
+        pub sent_events: Arc<Mutex<Vec<SentEvent>>>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct SentEvent {
+        pub handler: String,
+        pub payload: String,
+    }
+
+    impl Default for MockEventSender {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl MockEventSender {
+        pub fn new() -> Self {
+            Self {
+                sent_events: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        pub fn get_sent_events(&self) -> Vec<SentEvent> {
+            self.sent_events.lock().unwrap().clone()
+        }
+
+        pub fn clear(&self) {
+            self.sent_events.lock().unwrap().clear()
+        }
+    }
+
+    #[async_trait]
+    impl EventSender for MockEventSender {
+        async fn send<T: Serialize + Send + Sync>(
+            &self,
+            handler: &str,
+            payload: &T,
+        ) -> anyhow::Result<()> {
+            let payload_json = serde_json::to_string(payload)?;
+            self.sent_events.lock().unwrap().push(SentEvent {
+                handler: handler.to_string(),
+                payload: payload_json,
+            });
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_event_sender_creation() {
+        let sender = HttpEventSender::new("https://example.com/webhook".to_string(), false);
+        assert!(sender.is_ok());
+    }
+
+    #[test]
+    fn test_http_event_sender_creation_insecure() {
+        let sender = HttpEventSender::new("https://example.com/webhook".to_string(), true);
+        assert!(sender.is_ok());
+    }
+
+    #[test]
+    fn test_webhook_url_getter() {
+        let url = "https://example.com/webhook".to_string();
+        let sender = HttpEventSender::new(url.clone(), false).unwrap();
+        assert_eq!(sender.webhook_url(), url);
+    }
+}

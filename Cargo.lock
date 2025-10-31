@@ -488,6 +488,7 @@ dependencies = [
  "envy",
  "reqwest 0.12.24",
  "serde",
+ "serde_json",
  "serenity",
  "tokio",
  "tracing",

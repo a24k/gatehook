@@ -1,8 +1,14 @@
+mod logic;
 mod params;
+mod services;
 pub mod webhook;
 
 use anyhow::Context as _;
-use tracing::{debug, error, info};
+use logic::event_bridge::EventBridge;
+use services::discord::SerenityDiscordService;
+use services::event_sender::HttpEventSender;
+use std::sync::Arc;
+use tracing::{error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -11,17 +17,23 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler {
-    webhook_client: webhook::WebhookClient,
+    bridge: EventBridge<SerenityDiscordService, HttpEventSender>,
 }
 
 impl Handler {
-    fn new(params: &params::Params) -> anyhow::Result<Handler> {
-        let webhook_client = webhook::WebhookClient::new(
+    fn new(
+        params: &params::Params,
+        http: Arc<serenity::http::Http>,
+    ) -> anyhow::Result<Handler> {
+        let discord_service = Arc::new(SerenityDiscordService::new(http));
+        let event_sender = Arc::new(HttpEventSender::new(
             params.webhook_url.clone(),
             params.insecure_mode,
-        )?;
+        )?);
 
-        Ok(Handler { webhook_client })
+        let bridge = EventBridge::new(discord_service, event_sender);
+
+        Ok(Handler { bridge })
     }
 }
 
@@ -36,35 +48,22 @@ impl EventHandler for Handler {
             install_url = %format!("https://discord.com/oauth2/authorize?client_id={}&scope=bot", ready.application.id),
             "Bot install URL available"
         );
+
+        if let Err(e) = self.bridge.handle_ready(&ready).await {
+            error!(error = ?e, "Failed to handle ready event");
+        }
     }
 
-    async fn message(&self, ctx: Context, message: Message) {
-        debug!(
-            message_id = %message.id,
-            author = %message.author.name,
-            content = %message.content,
-            "Received message"
-        );
-
-        if message.content == "Ping!"
-            && let Err(why) = message.reply(&ctx.http, "Pong!").await
-        {
-            error!(error = ?why, "Failed to send message reply");
+    async fn message(&self, _: Context, message: Message) {
+        if let Err(e) = self.bridge.handle_message(&message).await {
+            error!(error = ?e, "Failed to handle message event");
         }
-
-        // Send message to webhook endpoint
-        self.webhook_client
-            .send_with_logging("message", &message, &message.id.to_string())
-            .await;
     }
 
     async fn reaction_add(&self, _: Context, reaction: Reaction) {
-        debug!(
-            message_id = %reaction.message_id,
-            user_id = ?reaction.user_id,
-            emoji = ?reaction.emoji,
-            "Received reaction"
-        );
+        if let Err(e) = self.bridge.handle_reaction_add(&reaction).await {
+            error!(error = ?e, "Failed to handle reaction_add event");
+        }
     }
 }
 
@@ -98,9 +97,12 @@ async fn main() -> anyhow::Result<()> {
         | GatewayIntents::DIRECT_MESSAGE_REACTIONS
         | GatewayIntents::MESSAGE_CONTENT;
 
+    // Create HTTP client for Discord API (needed for Handler)
+    let http = Arc::new(serenity::http::Http::new(&params.discord_token));
+
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&params.discord_token, intents)
-        .event_handler(Handler::new(&params)?)
+        .event_handler(Handler::new(&params, http)?)
         .await
         .context("Creating Discord Client")?;
 
