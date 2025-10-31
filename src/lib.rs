@@ -3,4 +3,3 @@
 
 pub mod adapters;
 pub mod bridge;
-pub mod webhook;

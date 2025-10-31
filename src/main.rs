@@ -1,7 +1,6 @@
 mod adapters;
 mod bridge;
 mod params;
-pub mod webhook;
 
 use anyhow::Context as _;
 use adapters::discord::SerenityDiscordService;
