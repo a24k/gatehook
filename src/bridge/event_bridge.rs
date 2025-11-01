@@ -1,5 +1,4 @@
-use crate::adapters::discord::DiscordService;
-use crate::adapters::event_sender::EventSender;
+use crate::adapters::{DiscordService, EventSender};
 use serenity::model::channel::{Message, Reaction};
 use serenity::model::gateway::Ready;
 use std::sync::Arc;

@@ -1,4 +1,4 @@
-use gatehook::adapters::discord::DiscordService;
+use gatehook::adapters::DiscordService;
 use serenity::async_trait;
 use serenity::model::id::{ChannelId, MessageId};
 use std::sync::{Arc, Mutex};

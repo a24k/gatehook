@@ -3,8 +3,7 @@ mod bridge;
 mod params;
 
 use anyhow::Context as _;
-use adapters::discord::SerenityDiscordService;
-use adapters::event_sender::HttpEventSender;
+use adapters::{HttpEventSender, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
 use std::sync::Arc;
 use tracing::{error, info};

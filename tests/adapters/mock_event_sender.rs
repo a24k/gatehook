@@ -1,4 +1,4 @@
-use gatehook::adapters::event_sender::EventSender;
+use gatehook::adapters::EventSender;
 use serde::Serialize;
 use serde_json;
 use serenity::async_trait;
