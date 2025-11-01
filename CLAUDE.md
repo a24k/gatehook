@@ -14,14 +14,56 @@ This document provides essential information for AI assistants working on the ga
 
 ```
 src/
-├── main.rs         # Entry point, Discord event handler
-├── lib.rs          # Library exports
-├── params.rs       # Configuration (env vars)
-└── webhook.rs      # WebhookClient for HTTP forwarding
+├── main.rs                 # Entry point, Discord event handler
+├── lib.rs                  # Library exports
+├── params.rs               # Configuration (env vars)
+├── adapters/               # External service adapters
+│   ├── discord_service.rs           # Discord operations trait
+│   ├── serenity_discord_service.rs  # Serenity implementation
+│   ├── event_sender_trait.rs        # Event sending trait
+│   ├── http_event_sender.rs         # HTTP implementation
+│   └── mod.rs
+└── bridge/                 # Business logic layer
+    ├── event_bridge.rs     # Event processing logic
+    └── mod.rs
 
 tests/
-└── webhook_integration_test.rs
+├── adapters/               # Mock implementations
+│   ├── mock_discord.rs
+│   ├── mock_event_sender.rs
+│   └── mod.rs
+└── event_bridge_test.rs    # Integration tests
 ```
+
+## Architecture
+
+The project follows a **layered architecture** with clear separation of concerns:
+
+### Adapters Layer (`src/adapters/`)
+External service abstractions and implementations:
+
+- **`DiscordService` trait**: Abstracts Discord operations
+  - `SerenityDiscordService`: Production implementation using serenity
+  - `MockDiscordService` (tests): Records calls for verification
+
+- **`EventSender` trait**: Abstracts event forwarding
+  - `HttpEventSender`: Sends events to HTTP endpoints
+  - `MockEventSender` (tests): Records sent events
+
+### Bridge Layer (`src/bridge/`)
+Business logic that orchestrates adapters:
+
+- **`EventBridge`**: Coordinates Discord and HTTP operations
+  - Generic over `DiscordService` and `EventSender` traits
+  - Implements ping-pong logic and event forwarding
+  - Fully testable with mocks
+
+### Application Layer (`src/main.rs`)
+Entry point that wires everything together:
+
+- `Handler`: Thin adapter implementing serenity's `EventHandler`
+- Passes `ctx.http` from Context to bridge (follows serenity's design)
+- Currently handles: `ready`, `message`, `reaction_add` events
 
 ## Key Modules
 
@@ -30,15 +72,15 @@ tests/
 - Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
 - Optional: `INSECURE_MODE`, `RUST_LOG`
 
-### `webhook.rs`
-- `WebhookClient`: Encapsulates HTTP client and webhook URL
-- `send()`: Low-level webhook sending
-- `send_with_logging()`: Convenience method with structured logging
+### `adapters/http_event_sender.rs`
+- `HttpEventSender`: Sends events to HTTP endpoints
+- Uses `url::Url` type for early URL validation
+- Configurable TLS certificate validation (insecure mode for testing)
 
-### `main.rs`
-- `Handler`: Implements serenity's `EventHandler` trait
-- Currently handles: `ready`, `message`, `reaction_add` events
-- Uses `WebhookClient` for forwarding events
+### `bridge/event_bridge.rs`
+- `EventBridge`: Core business logic
+- Generic design enables testing without external dependencies
+- Receives `http` from Context (not stored as state)
 
 ## Development Workflow
 
@@ -64,40 +106,67 @@ All checks must pass before committing.
 ## Testing Strategy
 
 ### Current Approach
-- Unit tests in module files (`#[cfg(test)]`)
-- Integration tests in `tests/` directory
-- Mock external services when possible
+- **Trait-based mocking**: `DiscordService` and `EventSender` traits enable clean mocks
+- **Unit tests**: In `src/adapters/` modules (`#[cfg(test)]`)
+- **Integration tests**: In `tests/` directory, testing `EventBridge` with mocks
+- **Mock implementations**: Located in `tests/adapters/` for reusability
 
-### Future Considerations
-- Add mock HTTP server for webhook tests (e.g., wiremock)
-- Test Discord event handling with mock serenity context
+### Test Organization
+```
+tests/
+├── adapters/
+│   ├── mock_discord.rs      # MockDiscordService with RecordedReply
+│   ├── mock_event_sender.rs # MockEventSender with SentEvent
+│   └── mod.rs               # Public exports
+└── event_bridge_test.rs     # EventBridge logic tests
+```
+
+### Testing Best Practices
+- Mock implementations record calls for verification
+- Tests use dummy `Http` instances (not needed by mocks)
+- Each test creates fresh mock instances (no shared state)
+- Business logic fully testable without external services
 
 ## Architecture Principles
 
-### Current (Minimal)
-- Simple module separation
-- `WebhookClient` abstracts HTTP concerns
-- Tests verify basic functionality
+### Design Patterns
+- **Hexagonal Architecture**: Clear separation between adapters and business logic
+- **Dependency Injection**: Traits injected via generics
+- **Zero-Cost Abstractions**: Trait objects only where needed (Arc<dyn Trait>)
+
+### Key Decisions
+1. **Traits over concrete types**: Enables testing and future flexibility
+2. **Context-based Http passing**: Follows serenity's design philosophy
+3. **Unit structs for stateless services**: `SerenityDiscordService` has no fields
+4. **Type-safe URLs**: `url::Url` provides early validation
 
 ### Future Growth Path
 When complexity increases:
-1. Add trait abstraction for `WebhookClient` (for mocking)
-2. Separate handlers into `handlers/` module
-3. Implement retry logic and error handling strategies
-4. Consider middleware pattern for event processing
+1. ✅ ~~Add trait abstraction~~ (Done)
+2. Add retry logic and circuit breakers for HTTP calls
+3. Implement more sophisticated error handling strategies
+4. Consider event middleware/pipeline pattern for transformations
 
 ## Common Tasks
 
 ### Adding New Event Handler
 1. Update `GatewayIntents` in `main.rs` if needed
-2. Implement handler method in `EventHandler` trait
-3. Use `WebhookClient::send_with_logging()` to forward
-4. Add tests
+2. Add method to `EventBridge` in `src/bridge/event_bridge.rs`
+3. Call bridge method from `Handler` in `main.rs`, passing `ctx.http`
+4. Use `event_sender.send()` to forward events
+5. Add tests in `tests/event_bridge_test.rs` using mocks
+
+### Adding New Discord Operation
+1. Add method to `DiscordService` trait in `src/adapters/discord_service.rs`
+2. Implement in `SerenityDiscordService` (accepts `http` parameter)
+3. Implement in `MockDiscordService` (record call for verification)
+4. Use from `EventBridge` by passing `http` from Context
 
 ### Adding Configuration
 1. Add field to `Params` struct in `params.rs`
 2. Use `#[serde(default)]` for optional values
 3. Update README.md environment variables table
+4. Update `.env.example` with new variable
 
 ### Refactoring Guidelines
 - Keep changes incremental
