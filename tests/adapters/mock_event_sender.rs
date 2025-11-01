@@ -11,6 +11,7 @@ pub struct MockEventSender {
 #[derive(Debug, Clone)]
 pub struct SentEvent {
     pub handler: String,
+    #[allow(dead_code)]
     pub payload: String,
 }
 
@@ -31,6 +32,7 @@ impl MockEventSender {
         self.sent_events.lock().unwrap().clone()
     }
 
+    #[allow(dead_code)]
     pub fn clear(&self) {
         self.sent_events.lock().unwrap().clear()
     }

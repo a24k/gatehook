@@ -31,6 +31,7 @@ impl MockDiscordService {
         self.replies.lock().unwrap().clone()
     }
 
+    #[allow(dead_code)]
     pub fn clear(&self) {
         self.replies.lock().unwrap().clear()
     }
