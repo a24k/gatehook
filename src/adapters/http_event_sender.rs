@@ -35,25 +35,6 @@ impl HttpEventSender {
     pub fn endpoint(&self) -> &Url {
         &self.endpoint
     }
-
-    /// Send a payload to the webhook endpoint (low-level)
-    ///
-    /// # Arguments
-    ///
-    /// * `handler` - The handler name (e.g., "message", "reaction")
-    /// * `payload` - The payload to send (will be serialized as JSON)
-    async fn send_request<T: Serialize>(
-        &self,
-        handler: &str,
-        payload: &T,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        self.client
-            .post(self.endpoint.clone())
-            .query(&[("handler", handler)])
-            .json(payload)
-            .send()
-            .await
-    }
 }
 
 #[async_trait]
@@ -63,7 +44,14 @@ impl EventSender for HttpEventSender {
         handler: &str,
         payload: &T,
     ) -> anyhow::Result<()> {
-        match self.send_request(handler, payload).await {
+        match self
+            .client
+            .post(self.endpoint.clone())
+            .query(&[("handler", handler)])
+            .json(payload)
+            .send()
+            .await
+        {
             Ok(response) => {
                 info!(
                     status = %response.status(),
