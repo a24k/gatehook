@@ -4,11 +4,11 @@ use serenity::model::id::{ChannelId, MessageId};
 use std::sync::{Arc, Mutex};
 
 pub struct MockDiscordService {
-    pub replies: Arc<Mutex<Vec<Reply>>>,
+    pub replies: Arc<Mutex<Vec<RecordedReply>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Reply {
+pub struct RecordedReply {
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub content: String,
@@ -27,7 +27,7 @@ impl MockDiscordService {
         }
     }
 
-    pub fn get_replies(&self) -> Vec<Reply> {
+    pub fn get_replies(&self) -> Vec<RecordedReply> {
         self.replies.lock().unwrap().clone()
     }
 }
@@ -41,7 +41,7 @@ impl DiscordService for MockDiscordService {
         message_id: MessageId,
         content: &str,
     ) -> Result<(), serenity::Error> {
-        self.replies.lock().unwrap().push(Reply {
+        self.replies.lock().unwrap().push(RecordedReply {
             channel_id,
             message_id,
             content: content.to_string(),
