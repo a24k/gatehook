@@ -10,7 +10,7 @@ The following environment variables are required or optional for running gatehoo
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
 | `DISCORD_TOKEN` | Yes | Discord bot token obtained from Discord Developer Portal | `MTA1234...` |
-| `WEBHOOK_URL` | Yes | The webhook endpoint URL to forward Discord events | `https://example.com/webhook` |
+| `HTTP_ENDPOINT` | Yes | The HTTP endpoint URL to forward Discord events | `https://example.com/webhook` |
 | `INSECURE_MODE` | No | Accept invalid TLS certificates (for testing only). Set to `true` to enable. Defaults to `false`. | `true` |
 | `RUST_LOG` | No | Control logging level. See [Logging](#logging) section for details. | `info`, `debug`, `trace` |
 

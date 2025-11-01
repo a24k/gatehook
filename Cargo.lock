@@ -481,17 +481,19 @@ dependencies = [
 
 [[package]]
 name = "gatehook"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "anyhow",
  "dotenvy",
  "envy",
  "reqwest 0.12.24",
  "serde",
+ "serde_json",
  "serenity",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]

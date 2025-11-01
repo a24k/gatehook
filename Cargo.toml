@@ -1,6 +1,6 @@
 [package]
 name = "gatehook"
-version = "0.4.5"
+version = "0.4.6"
 authors = ["Atsushi KAWASAKI <ak@xlix.org>"]
 description = "Bridge Discord Gateway (WebSocket) events to HTTP webhooks"
 edition = "2024"
@@ -15,6 +15,7 @@ anyhow = "1.0.100"
 dotenvy = "0.15.7"
 envy = "0.4.2"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
 reqwest = { version = "0.12.24", default-features = false, features = [
     "rustls-tls",
@@ -23,3 +24,4 @@ reqwest = { version = "0.12.24", default-features = false, features = [
 serenity = "0.12.4"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+url = "2.5"

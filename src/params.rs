@@ -6,7 +6,7 @@ pub struct Params {
     #[serde(default)]
     pub insecure_mode: bool,
     pub discord_token: String,
-    pub webhook_url: String,
+    pub http_endpoint: String,
 }
 
 /// Mask sensitive strings by showing only first and last few characters
@@ -33,7 +33,7 @@ impl std::fmt::Debug for Params {
         f.debug_struct("Params")
             .field("insecure_mode", &self.insecure_mode)
             .field("discord_token", &mask_token(&self.discord_token))
-            .field("webhook_url", &self.webhook_url)
+            .field("http_endpoint", &self.http_endpoint)
             .finish()
     }
 }
@@ -74,7 +74,7 @@ mod tests {
         let params = Params {
             insecure_mode: false,
             discord_token: "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5".to_string(),
-            webhook_url: "https://example.com/webhook/secret123456".to_string(),
+            http_endpoint: "https://example.com/webhook/secret123456".to_string(),
         };
 
         let debug_output = format!("{:?}", params);
@@ -85,7 +85,7 @@ mod tests {
         // Should NOT contain full discord_token
         assert!(!debug_output.contains("MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5"));
 
-        // webhook_url should be visible (not masked)
+        // http_endpoint should be visible (not masked)
         assert!(debug_output.contains("https://example.com/webhook/secret123456"));
     }
 }
