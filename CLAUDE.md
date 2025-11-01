@@ -25,6 +25,7 @@ src/
 │   └── mod.rs
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic
+    ├── message_filter.rs   # Message filtering by sender type
     └── mod.rs
 
 tests/
@@ -58,12 +59,20 @@ Business logic that orchestrates adapters:
   - Implements ping-pong logic and event forwarding
   - Fully testable with mocks
 
+- **`MessageFilter`**: Filters messages based on sender type
+  - MECE (Mutually Exclusive, Collectively Exhaustive) classification
+  - Policy-based filtering from environment variable strings
+  - Supports: self, webhook, system, bot, user
+
 ### Application Layer (`src/main.rs`)
 Entry point that wires everything together:
 
 - `Handler`: Thin adapter implementing serenity's `EventHandler`
 - Passes `ctx.http` from Context to bridge (follows serenity's design)
-- Currently handles: `ready`, `message`, `reaction_add` events
+- Stores `current_user_id` for message filtering
+- Dynamically builds `GatewayIntents` based on enabled events
+- Currently handles: `ready`, `message` events
+- Applies `MessageFilter` based on message context (Direct/Guild)
 
 ## Key Modules
 
@@ -71,6 +80,8 @@ Entry point that wires everything together:
 - `Params` struct: Configuration loaded from environment variables
 - Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
 - Optional: `INSECURE_MODE`, `RUST_LOG`
+- Event configuration: `MESSAGE_DIRECT`, `MESSAGE_GUILD`, `READY` (all optional)
+- Helper methods: `has_direct_message_events()`, `has_guild_message_events()`
 
 ### `adapters/http_event_sender.rs`
 - `HttpEventSender`: Sends events to HTTP endpoints
@@ -81,6 +92,13 @@ Entry point that wires everything together:
 - `EventBridge`: Core business logic
 - Generic design enables testing without external dependencies
 - Receives `http` from Context (not stored as state)
+
+### `bridge/message_filter.rs`
+- `MessageFilter`: Implements MECE message filtering
+- Policy parsing: `from_policy("user,bot")` → filter configuration
+- Special values: `"all"` (everything), `""` (everything except self)
+- Filter application: `should_process(&message, current_user_id)` → bool
+- Classification priority: self → webhook → system → bot → user
 
 ## Development Workflow
 
@@ -139,6 +157,10 @@ tests/
 2. **Context-based Http passing**: Follows serenity's design philosophy
 3. **Unit structs for stateless services**: `SerenityDiscordService` has no fields
 4. **Type-safe URLs**: `url::Url` provides early validation
+5. **Environment variable-based event control**: Handlers only registered when configured
+6. **MECE message classification**: Eliminates ambiguity in filtering decisions
+7. **Context-aware filtering**: Separate policies for Direct Messages vs Guild messages
+8. **Dynamic Gateway Intents**: Only request permissions for enabled events
 
 ### Future Growth Path
 When complexity increases:
@@ -150,11 +172,20 @@ When complexity increases:
 ## Common Tasks
 
 ### Adding New Event Handler
-1. Update `GatewayIntents` in `main.rs` if needed
-2. Add method to `EventBridge` in `src/bridge/event_bridge.rs`
-3. Call bridge method from `Handler` in `main.rs`, passing `ctx.http`
-4. Use `event_sender.send()` to forward events
-5. Add tests in `tests/event_bridge_test.rs` using mocks
+1. Add environment variable field to `Params` struct in `params.rs`
+   - For context-specific events: `<event>_direct` and `<event>_guild` fields
+   - For context-independent events: single `<event>` field
+   - Use `#[serde(default)]` to make them optional
+2. Update helper methods in `Params` if needed (e.g., `has_direct_*_events()`)
+3. Update `build_gateway_intents()` in `main.rs` to include necessary intents
+4. Add event handler method to `EventBridge` in `src/bridge/event_bridge.rs`
+5. Implement handler in `Handler` trait in `main.rs`:
+   - Check if event is enabled via `params.<event>_direct` / `params.<event>_guild`
+   - Apply `MessageFilter` if applicable
+   - Call bridge method, passing `ctx.http`
+6. Update `.env.example` with new environment variable
+7. Update README.md "Available Events" table
+8. Add tests in `tests/event_bridge_test.rs` using mocks
 
 ### Adding New Discord Operation
 1. Add method to `DiscordService` trait in `src/adapters/discord_service.rs`
