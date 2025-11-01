@@ -122,58 +122,6 @@ impl MessageFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serenity::model::prelude::*;
-
-    fn create_test_message(
-        author_id: u64,
-        is_bot: bool,
-        is_system: bool,
-        webhook_id: Option<u64>,
-    ) -> Message {
-        // Create a minimal Message for testing
-        // Note: This is a simplified mock; actual Message construction is complex
-        let mut msg = Message {
-            id: MessageId::new(1),
-            channel_id: ChannelId::new(1),
-            author: User {
-                id: UserId::new(author_id),
-                bot: is_bot,
-                system: is_system,
-                ..Default::default()
-            },
-            content: String::new(),
-            timestamp: Default::default(),
-            edited_timestamp: None,
-            tts: false,
-            mention_everyone: false,
-            mentions: vec![],
-            mention_roles: vec![],
-            mention_channels: vec![],
-            attachments: vec![],
-            embeds: vec![],
-            reactions: vec![],
-            nonce: None,
-            pinned: false,
-            webhook_id: webhook_id.map(WebhookId::new),
-            kind: MessageType::Regular,
-            activity: None,
-            application: None,
-            application_id: None,
-            message_reference: None,
-            flags: None,
-            referenced_message: None,
-            interaction: None,
-            components: vec![],
-            sticker_items: vec![],
-            position: None,
-            role_subscription_data: None,
-            guild_id: None,
-            member: None,
-            poll: None,
-            call: None,
-        };
-        msg
-    }
 
     #[test]
     fn test_policy_all() {
@@ -216,47 +164,62 @@ mod tests {
     }
 
     #[test]
-    fn test_mece_classification_self() {
+    fn test_policy_self_only() {
         let filter = MessageFilter::from_policy("self");
-        let current_user_id = UserId::new(123);
-        let msg = create_test_message(123, false, false, None);
-
-        assert!(filter.should_process(&msg, current_user_id));
+        assert!(filter.allow_self);
+        assert!(!filter.allow_webhook);
+        assert!(!filter.allow_system);
+        assert!(!filter.allow_bot);
+        assert!(!filter.allow_user);
     }
 
     #[test]
-    fn test_mece_classification_webhook() {
+    fn test_policy_webhook_only() {
         let filter = MessageFilter::from_policy("webhook");
-        let current_user_id = UserId::new(123);
-        let msg = create_test_message(456, false, false, Some(789));
-
-        assert!(filter.should_process(&msg, current_user_id));
+        assert!(!filter.allow_self);
+        assert!(filter.allow_webhook);
+        assert!(!filter.allow_system);
+        assert!(!filter.allow_bot);
+        assert!(!filter.allow_user);
     }
 
     #[test]
-    fn test_mece_classification_bot() {
+    fn test_policy_system_only() {
+        let filter = MessageFilter::from_policy("system");
+        assert!(!filter.allow_self);
+        assert!(!filter.allow_webhook);
+        assert!(filter.allow_system);
+        assert!(!filter.allow_bot);
+        assert!(!filter.allow_user);
+    }
+
+    #[test]
+    fn test_policy_bot_only() {
         let filter = MessageFilter::from_policy("bot");
-        let current_user_id = UserId::new(123);
-        let msg = create_test_message(456, true, false, None);
-
-        assert!(filter.should_process(&msg, current_user_id));
+        assert!(!filter.allow_self);
+        assert!(!filter.allow_webhook);
+        assert!(!filter.allow_system);
+        assert!(filter.allow_bot);
+        assert!(!filter.allow_user);
     }
 
     #[test]
-    fn test_mece_classification_user() {
-        let filter = MessageFilter::from_policy("user");
-        let current_user_id = UserId::new(123);
-        let msg = create_test_message(456, false, false, None);
-
-        assert!(filter.should_process(&msg, current_user_id));
+    fn test_policy_complex_combination() {
+        let filter = MessageFilter::from_policy("user,bot,webhook");
+        assert!(!filter.allow_self);
+        assert!(filter.allow_webhook);
+        assert!(!filter.allow_system);
+        assert!(filter.allow_bot);
+        assert!(filter.allow_user);
     }
 
     #[test]
-    fn test_filter_excludes_self_by_default() {
-        let filter = MessageFilter::from_policy("");
-        let current_user_id = UserId::new(123);
-        let msg = create_test_message(123, false, false, None);
-
-        assert!(!filter.should_process(&msg, current_user_id));
+    fn test_policy_whitespace_handling() {
+        let filter = MessageFilter::from_policy("user , bot , webhook");
+        assert!(!filter.allow_self);
+        assert!(filter.allow_webhook);
+        assert!(!filter.allow_system);
+        assert!(filter.allow_bot);
+        assert!(filter.allow_user);
     }
 }

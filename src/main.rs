@@ -85,10 +85,10 @@ impl EventHandler for Handler {
 
         // Apply message filter
         let filter = MessageFilter::from_policy(policy);
-        if let Some(user_id) = self.current_user_id.get() {
-            if !filter.should_process(&message, *user_id) {
-                return;
-            }
+        if let Some(user_id) = self.current_user_id.get()
+            && !filter.should_process(&message, *user_id)
+        {
+            return;
         }
 
         if let Err(e) = self.bridge.handle_message(&ctx.http, &message).await {
