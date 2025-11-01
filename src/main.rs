@@ -20,7 +20,7 @@ struct Handler {
 
 impl Handler {
     fn new(params: &params::Params) -> anyhow::Result<Handler> {
-        let discord_service = Arc::new(SerenityDiscordService::new());
+        let discord_service = Arc::new(SerenityDiscordService);
 
         let endpoint = url::Url::parse(&params.http_endpoint)
             .context("Parsing HTTP_ENDPOINT URL")?;

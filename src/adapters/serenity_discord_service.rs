@@ -5,19 +5,6 @@ use serenity::model::id::{ChannelId, MessageId};
 /// Serenity経由でDiscord操作を行う実装
 pub struct SerenityDiscordService;
 
-impl SerenityDiscordService {
-    /// Create a new SerenityDiscordService
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SerenityDiscordService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
 impl DiscordService for SerenityDiscordService {
     async fn reply_to_message(
