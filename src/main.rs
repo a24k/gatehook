@@ -5,17 +5,20 @@ mod params;
 use anyhow::Context as _;
 use adapters::{HttpEventSender, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
+use bridge::message_filter::MessageFilter;
 use std::sync::Arc;
 use tracing::{error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
-use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
+use serenity::model::id::UserId;
 use serenity::prelude::*;
 
 struct Handler {
     bridge: EventBridge<SerenityDiscordService, HttpEventSender>,
+    params: Arc<params::Params>,
+    current_user_id: std::sync::OnceLock<UserId>,
 }
 
 impl Handler {
@@ -31,15 +34,23 @@ impl Handler {
 
         let bridge = EventBridge::new(discord_service, event_sender);
 
-        Ok(Handler { bridge })
+        Ok(Handler {
+            bridge,
+            params: Arc::new(params.clone()),
+            current_user_id: std::sync::OnceLock::new(),
+        })
     }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
+        // Store current user ID for filtering
+        let _ = self.current_user_id.set(ready.user.id);
+
         info!(
             display_name = %ready.user.display_name(),
+            user_id = %ready.user.id,
             "Bot is connected"
         );
         info!(
@@ -47,20 +58,41 @@ impl EventHandler for Handler {
             "Bot install URL available"
         );
 
+        // Check if READY event is enabled
+        if self.params.ready.is_none() {
+            return;
+        }
+
         if let Err(e) = self.bridge.handle_ready(&ready).await {
             error!(error = ?e, "Failed to handle ready event");
         }
     }
 
     async fn message(&self, ctx: Context, message: Message) {
+        let is_direct = message.guild_id.is_none();
+
+        // Check which context-specific policy to use
+        let policy = if is_direct {
+            self.params.message_direct.as_deref()
+        } else {
+            self.params.message_guild.as_deref()
+        };
+
+        // If environment variable is not set, don't process
+        let Some(policy) = policy else {
+            return;
+        };
+
+        // Apply message filter
+        let filter = MessageFilter::from_policy(policy);
+        if let Some(user_id) = self.current_user_id.get() {
+            if !filter.should_process(&message, *user_id) {
+                return;
+            }
+        }
+
         if let Err(e) = self.bridge.handle_message(&ctx.http, &message).await {
             error!(error = ?e, "Failed to handle message event");
-        }
-    }
-
-    async fn reaction_add(&self, _: Context, reaction: Reaction) {
-        if let Err(e) = self.bridge.handle_reaction_add(&reaction).await {
-            error!(error = ?e, "Failed to handle reaction_add event");
         }
     }
 }
@@ -90,10 +122,9 @@ async fn main() -> anyhow::Result<()> {
     let params = params::Params::new()?;
     info!(?params, "Application parameters loaded");
 
-    // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGE_REACTIONS
-        | GatewayIntents::MESSAGE_CONTENT;
+    // Build gateway intents based on enabled events
+    let intents = build_gateway_intents(&params);
+    info!(?intents, "Gateway intents configured");
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&params.discord_token, intents)
@@ -106,4 +137,23 @@ async fn main() -> anyhow::Result<()> {
         .start_autosharded()
         .await
         .context("Running Discord Client")
+}
+
+/// Build GatewayIntents based on enabled events in parameters
+fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
+    let mut intents = GatewayIntents::empty();
+
+    // Direct Message events
+    if params.has_direct_message_events() {
+        intents |= GatewayIntents::DIRECT_MESSAGES;
+        intents |= GatewayIntents::MESSAGE_CONTENT;
+    }
+
+    // Guild Message events
+    if params.has_guild_message_events() {
+        intents |= GatewayIntents::GUILD_MESSAGES;
+        intents |= GatewayIntents::MESSAGE_CONTENT;
+    }
+
+    intents
 }
