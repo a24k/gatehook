@@ -1,5 +1,5 @@
 use crate::adapters::{DiscordService, EventSender};
-use serenity::model::channel::{Message, Reaction};
+use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
 use tracing::{debug, error};
@@ -62,25 +62,6 @@ where
 
         // Forward event to webhook endpoint
         self.event_sender.send("message", message).await?;
-
-        Ok(())
-    }
-
-    /// Handle a reaction_add event
-    ///
-    /// # Arguments
-    ///
-    /// * `reaction` - The reaction event from Discord
-    pub async fn handle_reaction_add(&self, reaction: &Reaction) -> anyhow::Result<()> {
-        debug!(
-            message_id = %reaction.message_id,
-            user_id = ?reaction.user_id,
-            emoji = ?reaction.emoji,
-            "Processing reaction_add event"
-        );
-
-        // Forward event to webhook endpoint
-        self.event_sender.send("reaction_add", reaction).await?;
 
         Ok(())
     }
