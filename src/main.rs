@@ -5,7 +5,6 @@ mod params;
 use anyhow::Context as _;
 use adapters::{HttpEventSender, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
-use bridge::message_filter::MessageFilter;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -71,20 +70,19 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, message: Message) {
         let is_direct = message.guild_id.is_none();
 
-        // Check which context-specific policy to use
-        let policy = if is_direct {
-            self.params.message_direct.as_deref()
+        // Check which context-specific filter to use
+        let filter = if is_direct {
+            self.params.message_direct.as_ref()
         } else {
-            self.params.message_guild.as_deref()
+            self.params.message_guild.as_ref()
         };
 
-        // If environment variable is not set, don't process
-        let Some(policy) = policy else {
+        // If filter is not configured, don't process
+        let Some(filter) = filter else {
             return;
         };
 
         // Apply message filter
-        let filter = MessageFilter::from_policy(policy);
         if let Some(user_id) = self.current_user_id.get()
             && !filter.should_process(&message, *user_id)
         {

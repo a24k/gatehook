@@ -1,5 +1,17 @@
 use anyhow::Context as _;
 use serde::Deserialize;
+use crate::bridge::message_filter::MessageFilter;
+
+/// Deserialize environment variable string into MessageFilter
+fn deserialize_message_filter<'de, D>(
+    deserializer: D,
+) -> Result<Option<MessageFilter>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    Ok(s.map(|policy| MessageFilter::from_policy(&policy)))
+}
 
 #[derive(Deserialize, Clone)]
 pub struct Params {
@@ -12,12 +24,12 @@ pub struct Params {
     // Event Configuration
     // ========================================
     // Direct Message Events
-    #[serde(default)]
-    pub message_direct: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_message_filter")]
+    pub message_direct: Option<MessageFilter>,
 
     // Guild Events
-    #[serde(default)]
-    pub message_guild: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_message_filter")]
+    pub message_guild: Option<MessageFilter>,
 
     // Context-Independent Events
     #[serde(default)]
