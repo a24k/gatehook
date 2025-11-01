@@ -3,11 +3,12 @@ use anyhow::Context as _;
 use serde::Serialize;
 use serenity::async_trait;
 use tracing::{error, info};
+use url::Url;
 
 /// HTTP経由でイベントを送信する実装
 pub struct HttpEventSender {
     client: reqwest::Client,
-    webhook_url: String,
+    endpoint: Url,
 }
 
 impl HttpEventSender {
@@ -23,16 +24,19 @@ impl HttpEventSender {
             .build()
             .context("Building HTTP Client")?;
 
+        let endpoint = Url::parse(&webhook_url)
+            .context("Parsing webhook URL")?;
+
         Ok(Self {
             client,
-            webhook_url,
+            endpoint,
         })
     }
 
-    /// Get the webhook URL (for testing)
+    /// Get the endpoint URL (for testing)
     #[cfg(test)]
-    pub fn webhook_url(&self) -> &str {
-        &self.webhook_url
+    pub fn endpoint(&self) -> &Url {
+        &self.endpoint
     }
 
     /// Send a payload to the webhook endpoint (low-level)
@@ -47,7 +51,7 @@ impl HttpEventSender {
         payload: &T,
     ) -> Result<reqwest::Response, reqwest::Error> {
         self.client
-            .post(&self.webhook_url)
+            .post(self.endpoint.as_str())
             .query(&[("handler", handler)])
             .json(payload)
             .send()
@@ -75,7 +79,7 @@ impl EventSender for HttpEventSender {
                 error!(
                     error = ?err,
                     handler = %handler,
-                    webhook_url = %self.webhook_url,
+                    endpoint = %self.endpoint,
                     "Failed to send event to webhook"
                 );
                 Err(err.into())
@@ -101,9 +105,9 @@ mod tests {
     }
 
     #[test]
-    fn test_webhook_url_getter() {
-        let url = "https://example.com/webhook".to_string();
-        let sender = HttpEventSender::new(url.clone(), false).unwrap();
-        assert_eq!(sender.webhook_url(), url);
+    fn test_endpoint_getter() {
+        let url_str = "https://example.com/webhook";
+        let sender = HttpEventSender::new(url_str.to_string(), false).unwrap();
+        assert_eq!(sender.endpoint().as_str(), url_str);
     }
 }
