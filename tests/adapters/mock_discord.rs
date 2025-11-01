@@ -30,11 +30,6 @@ impl MockDiscordService {
     pub fn get_replies(&self) -> Vec<Reply> {
         self.replies.lock().unwrap().clone()
     }
-
-    #[allow(dead_code)]
-    pub fn clear(&self) {
-        self.replies.lock().unwrap().clear()
-    }
 }
 
 #[async_trait]

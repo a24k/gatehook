@@ -31,11 +31,6 @@ impl MockEventSender {
     pub fn get_sent_events(&self) -> Vec<SentEvent> {
         self.sent_events.lock().unwrap().clone()
     }
-
-    #[allow(dead_code)]
-    pub fn clear(&self) {
-        self.sent_events.lock().unwrap().clear()
-    }
 }
 
 #[async_trait]
