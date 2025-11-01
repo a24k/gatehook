@@ -51,7 +51,7 @@ impl HttpEventSender {
         payload: &T,
     ) -> Result<reqwest::Response, reqwest::Error> {
         self.client
-            .post(self.endpoint.as_str())
+            .post(self.endpoint.clone())
             .query(&[("handler", handler)])
             .json(payload)
             .send()
