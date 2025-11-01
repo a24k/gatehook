@@ -1,10 +1,9 @@
 use serenity::model::channel::Message;
 use serenity::model::id::UserId;
 
-/// Message filter based on sender classification
+/// Message filter based on sender type classification
 ///
-/// Filters messages based on MECE (Mutually Exclusive, Collectively Exhaustive)
-/// classification of message senders.
+/// Filters messages by classifying them into mutually exclusive sender categories.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
     allow_self: bool,
@@ -81,35 +80,36 @@ impl MessageFilter {
 
     /// Check if a message should be processed based on this filter
     ///
-    /// # MECE Classification
+    /// # Sender Type Classification
     ///
-    /// Messages are classified in priority order:
+    /// Messages are classified into mutually exclusive categories:
     /// 1. self - Bot's own messages
-    /// 2. webhook - Webhook messages
-    /// 3. system - System messages
-    /// 4. bot - Other bot messages
-    /// 5. user - Human user messages (default)
+    /// 2. webhook - Webhook messages (excluding self)
+    /// 3. system - System messages (excluding self and webhooks)
+    /// 4. bot - Other bot messages (excluding self and webhooks)
+    /// 5. user - Human user messages (default/fallback)
     ///
     /// This ensures every message falls into exactly one category.
     pub fn should_process(&self, message: &Message, current_user_id: UserId) -> bool {
-        // Priority-based MECE classification
+        // Sender type classification
 
         // 1. self
         if message.author.id == current_user_id {
             return self.allow_self;
         }
 
-        // 2. webhook
+        // 2. webhook (excluding self)
         if message.webhook_id.is_some() {
             return self.allow_webhook;
         }
 
-        // 3. system
+        // 3. system (excluding self and webhooks)
         if message.author.system {
             return self.allow_system;
         }
 
-        // 4. bot
+        // 4. bot (excluding self and webhooks)
+        // Note: Discord webhooks have author.bot = true, but are classified as 'webhook' above
         if message.author.bot {
             return self.allow_bot;
         }

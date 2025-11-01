@@ -60,7 +60,7 @@ Business logic that orchestrates adapters:
   - Fully testable with mocks
 
 - **`MessageFilter`**: Filters messages based on sender type
-  - MECE (Mutually Exclusive, Collectively Exhaustive) classification
+  - Sender type classification (mutually exclusive categories)
   - Policy-based filtering from environment variable strings
   - Supports: self, webhook, system, bot, user
 
@@ -94,11 +94,16 @@ Entry point that wires everything together:
 - Receives `http` from Context (not stored as state)
 
 ### `bridge/message_filter.rs`
-- `MessageFilter`: Implements MECE message filtering
+- `MessageFilter`: Implements sender type classification and filtering
 - Policy parsing: `from_policy("user,bot")` → filter configuration
 - Special values: `"all"` (everything), `""` (everything except self)
 - Filter application: `should_process(&message, current_user_id)` → bool
-- Classification priority: self → webhook → system → bot → user
+- Classification categories (mutually exclusive):
+  - `self` - Bot's own messages
+  - `webhook` - Webhook messages (excluding self)
+  - `system` - System messages (excluding self and webhooks)
+  - `bot` - Other bot messages (excluding self and webhooks)
+  - `user` - Human users (default)
 
 ## Development Workflow
 
@@ -158,7 +163,7 @@ tests/
 3. **Unit structs for stateless services**: `SerenityDiscordService` has no fields
 4. **Type-safe URLs**: `url::Url` provides early validation
 5. **Environment variable-based event control**: Handlers only registered when configured
-6. **MECE message classification**: Eliminates ambiguity in filtering decisions
+6. **Sender type classification**: Mutually exclusive categories eliminate ambiguity
 7. **Context-aware filtering**: Separate policies for Direct Messages vs Guild messages
 8. **Dynamic Gateway Intents**: Only request permissions for enabled events
 

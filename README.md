@@ -94,17 +94,19 @@ MESSAGE_DIRECT=""
 READY="all"
 ```
 
-### Filter Behavior (MECE Classification)
+### Sender Type Classification
 
-Messages are classified in priority order. Each message falls into exactly one category:
+Messages are classified into mutually exclusive sender categories. Each message falls into exactly one category:
 
-1. **self** - Bot's own messages (checked first by author ID)
-2. **webhook** - Webhook messages (has webhook_id)
-3. **system** - Discord system messages (author.system = true)
-4. **bot** - Other bot messages (author.bot = true)
+1. **self** - Bot's own messages
+2. **webhook** - Webhook messages (excluding self)
+3. **system** - Discord system messages (excluding self and webhooks)
+4. **bot** - Other bot messages (excluding self and webhooks)
 5. **user** - Human user messages (default/fallback)
 
-This MECE (Mutually Exclusive, Collectively Exhaustive) design ensures:
+**Note**: Discord webhooks have `author.bot = true`, but are classified as `webhook` rather than `bot` to allow separate filtering policies.
+
+This classification ensures:
 - Every message is classified exactly once
 - No ambiguity in filtering decisions
 - Predictable behavior
