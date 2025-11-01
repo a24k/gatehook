@@ -27,11 +27,14 @@ async fn test_handle_message_ping_pong() {
     let event_sender = Arc::new(MockEventSender::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
 
+    // Create a dummy HTTP client (token doesn't matter for mock)
+    let http = serenity::http::Http::new("dummy_token");
+
     // Create a "Ping!" message
     let message = create_test_message("Ping!", 123, 456);
 
     // Execute
-    let result = bridge.handle_message(&message).await;
+    let result = bridge.handle_message(&http, &message).await;
 
     // Verify
     assert!(result.is_ok(), "handle_message should succeed");
@@ -67,11 +70,14 @@ async fn test_handle_message_normal() {
     let event_sender = Arc::new(MockEventSender::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
 
+    // Create a dummy HTTP client (token doesn't matter for mock)
+    let http = serenity::http::Http::new("dummy_token");
+
     // Create a normal message (not "Ping!")
     let message = create_test_message("Hello, world!", 789, 456);
 
     // Execute
-    let result = bridge.handle_message(&message).await;
+    let result = bridge.handle_message(&http, &message).await;
 
     // Verify
     assert!(result.is_ok(), "handle_message should succeed");

@@ -36,6 +36,7 @@ impl MockDiscordService {
 impl DiscordService for MockDiscordService {
     async fn reply_to_message(
         &self,
+        _http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,

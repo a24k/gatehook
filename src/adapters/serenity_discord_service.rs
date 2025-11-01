@@ -1,21 +1,20 @@
 use super::discord_service::DiscordService;
 use serenity::async_trait;
 use serenity::model::id::{ChannelId, MessageId};
-use std::sync::Arc;
 
 /// Serenity経由でDiscord操作を行う実装
-pub struct SerenityDiscordService {
-    http: Arc<serenity::http::Http>,
-}
+pub struct SerenityDiscordService;
 
 impl SerenityDiscordService {
     /// Create a new SerenityDiscordService
-    ///
-    /// # Arguments
-    ///
-    /// * `http` - The serenity HTTP client
-    pub fn new(http: Arc<serenity::http::Http>) -> Self {
-        Self { http }
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for SerenityDiscordService {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -23,6 +22,7 @@ impl SerenityDiscordService {
 impl DiscordService for SerenityDiscordService {
     async fn reply_to_message(
         &self,
+        http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,
@@ -33,7 +33,7 @@ impl DiscordService for SerenityDiscordService {
             .content(content)
             .reference_message((channel_id, message_id));
 
-        channel_id.send_message(&self.http, builder).await?;
+        channel_id.send_message(http, builder).await?;
         Ok(())
     }
 }

@@ -19,11 +19,8 @@ struct Handler {
 }
 
 impl Handler {
-    fn new(
-        params: &params::Params,
-        http: Arc<serenity::http::Http>,
-    ) -> anyhow::Result<Handler> {
-        let discord_service = Arc::new(SerenityDiscordService::new(http));
+    fn new(params: &params::Params) -> anyhow::Result<Handler> {
+        let discord_service = Arc::new(SerenityDiscordService::new());
 
         let endpoint = url::Url::parse(&params.http_endpoint)
             .context("Parsing HTTP_ENDPOINT URL")?;
@@ -55,8 +52,8 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn message(&self, _: Context, message: Message) {
-        if let Err(e) = self.bridge.handle_message(&message).await {
+    async fn message(&self, ctx: Context, message: Message) {
+        if let Err(e) = self.bridge.handle_message(&ctx.http, &message).await {
             error!(error = ?e, "Failed to handle message event");
         }
     }
@@ -98,12 +95,9 @@ async fn main() -> anyhow::Result<()> {
         | GatewayIntents::DIRECT_MESSAGE_REACTIONS
         | GatewayIntents::MESSAGE_CONTENT;
 
-    // Create HTTP client for Discord API (needed for Handler)
-    let http = Arc::new(serenity::http::Http::new(&params.discord_token));
-
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&params.discord_token, intents)
-        .event_handler(Handler::new(&params, http)?)
+        .event_handler(Handler::new(&params)?)
         .await
         .context("Creating Discord Client")?;
 

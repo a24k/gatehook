@@ -36,8 +36,13 @@ where
     ///
     /// # Arguments
     ///
+    /// * `http` - The HTTP client from Context
     /// * `message` - The message event from Discord
-    pub async fn handle_message(&self, message: &Message) -> anyhow::Result<()> {
+    pub async fn handle_message(
+        &self,
+        http: &serenity::http::Http,
+        message: &Message,
+    ) -> anyhow::Result<()> {
         debug!(
             message_id = %message.id,
             author = %message.author.name,
@@ -49,7 +54,7 @@ where
         if message.content == "Ping!"
             && let Err(err) = self
                 .discord_service
-                .reply_to_message(message.channel_id, message.id, "Pong!")
+                .reply_to_message(http, message.channel_id, message.id, "Pong!")
                 .await
         {
             error!(error = ?err, "Failed to send message reply");
