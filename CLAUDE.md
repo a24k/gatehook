@@ -27,7 +27,7 @@ tests/
 
 ### `params.rs`
 - `Params` struct: Configuration loaded from environment variables
-- Required: `DISCORD_TOKEN`, `WEBHOOK_URL`
+- Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
 - Optional: `INSECURE_MODE`, `RUST_LOG`
 
 ### `webhook.rs`

@@ -24,8 +24,11 @@ impl Handler {
         http: Arc<serenity::http::Http>,
     ) -> anyhow::Result<Handler> {
         let discord_service = Arc::new(SerenityDiscordService::new(http));
+
+        let endpoint = url::Url::parse(&params.http_endpoint)
+            .context("Parsing HTTP_ENDPOINT URL")?;
         let event_sender = Arc::new(HttpEventSender::new(
-            params.webhook_url.clone(),
+            endpoint,
             params.insecure_mode,
         )?);
 

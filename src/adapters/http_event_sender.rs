@@ -16,16 +16,13 @@ impl HttpEventSender {
     ///
     /// # Arguments
     ///
-    /// * `webhook_url` - The URL of the webhook endpoint
+    /// * `endpoint` - The HTTP endpoint URL
     /// * `insecure_mode` - If true, accept invalid TLS certificates
-    pub fn new(webhook_url: String, insecure_mode: bool) -> anyhow::Result<Self> {
+    pub fn new(endpoint: Url, insecure_mode: bool) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(insecure_mode)
             .build()
             .context("Building HTTP Client")?;
-
-        let endpoint = Url::parse(&webhook_url)
-            .context("Parsing webhook URL")?;
 
         Ok(Self {
             client,
@@ -94,20 +91,23 @@ mod tests {
 
     #[test]
     fn test_http_event_sender_creation() {
-        let sender = HttpEventSender::new("https://example.com/webhook".to_string(), false);
+        let url = Url::parse("https://example.com/webhook").unwrap();
+        let sender = HttpEventSender::new(url, false);
         assert!(sender.is_ok());
     }
 
     #[test]
     fn test_http_event_sender_creation_insecure() {
-        let sender = HttpEventSender::new("https://example.com/webhook".to_string(), true);
+        let url = Url::parse("https://example.com/webhook").unwrap();
+        let sender = HttpEventSender::new(url, true);
         assert!(sender.is_ok());
     }
 
     #[test]
     fn test_endpoint_getter() {
         let url_str = "https://example.com/webhook";
-        let sender = HttpEventSender::new(url_str.to_string(), false).unwrap();
+        let url = Url::parse(url_str).unwrap();
+        let sender = HttpEventSender::new(url, false).unwrap();
         assert_eq!(sender.endpoint().as_str(), url_str);
     }
 }
