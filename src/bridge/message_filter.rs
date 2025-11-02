@@ -122,104 +122,52 @@ impl MessageFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_policy_all() {
-        let filter = MessageFilter::from_policy("all");
-        assert!(filter.allow_self);
-        assert!(filter.allow_webhook);
-        assert!(filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_empty() {
-        let filter = MessageFilter::from_policy("");
-        assert!(!filter.allow_self); // Self is excluded
-        assert!(filter.allow_webhook);
-        assert!(filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_user_only() {
-        let filter = MessageFilter::from_policy("user");
-        assert!(!filter.allow_self);
-        assert!(!filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(!filter.allow_bot);
-        assert!(filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_user_and_bot() {
-        let filter = MessageFilter::from_policy("user,bot");
-        assert!(!filter.allow_self);
-        assert!(!filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_self_only() {
-        let filter = MessageFilter::from_policy("self");
-        assert!(filter.allow_self);
-        assert!(!filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(!filter.allow_bot);
-        assert!(!filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_webhook_only() {
-        let filter = MessageFilter::from_policy("webhook");
-        assert!(!filter.allow_self);
-        assert!(filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(!filter.allow_bot);
-        assert!(!filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_system_only() {
-        let filter = MessageFilter::from_policy("system");
-        assert!(!filter.allow_self);
-        assert!(!filter.allow_webhook);
-        assert!(filter.allow_system);
-        assert!(!filter.allow_bot);
-        assert!(!filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_bot_only() {
-        let filter = MessageFilter::from_policy("bot");
-        assert!(!filter.allow_self);
-        assert!(!filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(!filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_complex_combination() {
-        let filter = MessageFilter::from_policy("user,bot,webhook");
-        assert!(!filter.allow_self);
-        assert!(filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(filter.allow_user);
-    }
-
-    #[test]
-    fn test_policy_whitespace_handling() {
-        let filter = MessageFilter::from_policy("user , bot , webhook");
-        assert!(!filter.allow_self);
-        assert!(filter.allow_webhook);
-        assert!(!filter.allow_system);
-        assert!(filter.allow_bot);
-        assert!(filter.allow_user);
+    #[rstest]
+    #[case("all", true, true, true, true, true)]
+    #[case("", false, true, true, true, true)]
+    #[case("user", false, false, false, false, true)]
+    #[case("bot", false, false, false, true, false)]
+    #[case("webhook", false, true, false, false, false)]
+    #[case("system", false, false, true, false, false)]
+    #[case("self", true, false, false, false, false)]
+    #[case("user,bot", false, false, false, true, true)]
+    #[case("user,bot,webhook", false, true, false, true, true)]
+    #[case("user , bot , webhook", false, true, false, true, true)]
+    fn test_policy_parsing(
+        #[case] policy: &str,
+        #[case] expect_self: bool,
+        #[case] expect_webhook: bool,
+        #[case] expect_system: bool,
+        #[case] expect_bot: bool,
+        #[case] expect_user: bool,
+    ) {
+        let filter = MessageFilter::from_policy(policy);
+        assert_eq!(
+            filter.allow_self, expect_self,
+            "allow_self mismatch for policy: '{}'",
+            policy
+        );
+        assert_eq!(
+            filter.allow_webhook, expect_webhook,
+            "allow_webhook mismatch for policy: '{}'",
+            policy
+        );
+        assert_eq!(
+            filter.allow_system, expect_system,
+            "allow_system mismatch for policy: '{}'",
+            policy
+        );
+        assert_eq!(
+            filter.allow_bot, expect_bot,
+            "allow_bot mismatch for policy: '{}'",
+            policy
+        );
+        assert_eq!(
+            filter.allow_user, expect_user,
+            "allow_user mismatch for policy: '{}'",
+            policy
+        );
     }
 }

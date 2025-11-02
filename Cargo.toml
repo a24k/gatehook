@@ -25,3 +25,6 @@ serenity = "0.12.4"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 url = "2.5"
+
+[dev-dependencies]
+rstest = "0.23"
