@@ -5,19 +5,21 @@ mod params;
 use anyhow::Context as _;
 use adapters::{HttpEventSender, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
+use bridge::message_filter::MessageFilter;
 use std::sync::Arc;
 use tracing::{error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::model::id::UserId;
 use serenity::prelude::*;
 
 struct Handler {
     bridge: EventBridge<SerenityDiscordService, HttpEventSender>,
     params: Arc<params::Params>,
-    current_user_id: std::sync::OnceLock<UserId>,
+    // Active filters initialized in ready event
+    message_direct_filter: std::sync::OnceLock<MessageFilter>,
+    message_guild_filter: std::sync::OnceLock<MessageFilter>,
 }
 
 impl Handler {
@@ -36,7 +38,8 @@ impl Handler {
         Ok(Handler {
             bridge,
             params: Arc::new(params.clone()),
-            current_user_id: std::sync::OnceLock::new(),
+            message_direct_filter: std::sync::OnceLock::new(),
+            message_guild_filter: std::sync::OnceLock::new(),
         })
     }
 }
@@ -44,8 +47,19 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
-        // Store current user ID for filtering
-        let _ = self.current_user_id.set(ready.user.id);
+        let current_user_id = ready.user.id;
+
+        // Initialize active filters with current user ID
+        if let Some(policy) = &self.params.message_direct {
+            let _ = self
+                .message_direct_filter
+                .set(policy.with_user_id(current_user_id));
+        }
+        if let Some(policy) = &self.params.message_guild {
+            let _ = self
+                .message_guild_filter
+                .set(policy.with_user_id(current_user_id));
+        }
 
         info!(
             display_name = %ready.user.display_name(),
@@ -70,22 +84,20 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, message: Message) {
         let is_direct = message.guild_id.is_none();
 
-        // Check which context-specific filter to use
+        // Get the appropriate active filter
         let filter = if is_direct {
-            self.params.message_direct.as_ref()
+            self.message_direct_filter.get()
         } else {
-            self.params.message_guild.as_ref()
+            self.message_guild_filter.get()
         };
 
-        // If filter is not configured, don't process
+        // If filter is not initialized (not ready yet) or not configured, don't process
         let Some(filter) = filter else {
             return;
         };
 
         // Apply message filter
-        if let Some(user_id) = self.current_user_id.get()
-            && !filter.should_process(&message, *user_id)
-        {
+        if !filter.should_process(&message) {
             return;
         }
 

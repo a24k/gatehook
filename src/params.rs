@@ -1,16 +1,16 @@
 use anyhow::Context as _;
 use serde::Deserialize;
-use crate::bridge::message_filter::MessageFilter;
+use crate::bridge::message_filter::MessageFilterPolicy;
 
-/// Deserialize environment variable string into MessageFilter
-fn deserialize_message_filter<'de, D>(
+/// Deserialize environment variable string into MessageFilterPolicy
+fn deserialize_message_filter_policy<'de, D>(
     deserializer: D,
-) -> Result<Option<MessageFilter>, D::Error>
+) -> Result<Option<MessageFilterPolicy>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s: Option<String> = Option::deserialize(deserializer)?;
-    Ok(s.map(|policy| MessageFilter::from_policy(&policy)))
+    Ok(s.map(|policy| MessageFilterPolicy::from_policy(&policy)))
 }
 
 #[derive(Deserialize, Clone)]
@@ -24,12 +24,12 @@ pub struct Params {
     // Event Configuration
     // ========================================
     // Direct Message Events
-    #[serde(default, deserialize_with = "deserialize_message_filter")]
-    pub message_direct: Option<MessageFilter>,
+    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
+    pub message_direct: Option<MessageFilterPolicy>,
 
     // Guild Events
-    #[serde(default, deserialize_with = "deserialize_message_filter")]
-    pub message_guild: Option<MessageFilter>,
+    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
+    pub message_guild: Option<MessageFilterPolicy>,
 
     // Context-Independent Events
     #[serde(default)]

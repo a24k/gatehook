@@ -1,11 +1,12 @@
 use serenity::model::channel::Message;
 use serenity::model::id::UserId;
 
-/// Message filter based on sender type classification
+/// Message filter policy parsed from environment variable
 ///
-/// Filters messages by classifying them into mutually exclusive sender categories.
+/// This represents the filtering rules without being tied to a specific bot user ID.
+/// Can be created at startup before connecting to Discord.
 #[derive(Debug, Clone)]
-pub struct MessageFilter {
+pub struct MessageFilterPolicy {
     allow_self: bool,
     allow_webhook: bool,
     allow_system: bool,
@@ -13,8 +14,8 @@ pub struct MessageFilter {
     allow_user: bool,
 }
 
-impl MessageFilter {
-    /// Create a filter from a policy string
+impl MessageFilterPolicy {
+    /// Create a policy from a policy string
     ///
     /// # Policy Syntax
     ///
@@ -78,6 +79,25 @@ impl MessageFilter {
         }
     }
 
+    /// Create an active filter with the bot's user ID
+    pub fn with_user_id(&self, current_user_id: UserId) -> MessageFilter {
+        MessageFilter {
+            current_user_id,
+            policy: self.clone(),
+        }
+    }
+}
+
+/// Active message filter with bot's user ID
+///
+/// This is created after the bot connects to Discord and knows its user ID.
+#[derive(Debug, Clone)]
+pub struct MessageFilter {
+    current_user_id: UserId,
+    policy: MessageFilterPolicy,
+}
+
+impl MessageFilter {
     /// Check if a message should be processed based on this filter
     ///
     /// # Sender Type Classification
@@ -90,32 +110,32 @@ impl MessageFilter {
     /// 5. user - Human user messages (default/fallback)
     ///
     /// This ensures every message falls into exactly one category.
-    pub fn should_process(&self, message: &Message, current_user_id: UserId) -> bool {
+    pub fn should_process(&self, message: &Message) -> bool {
         // Sender type classification
 
         // 1. self
-        if message.author.id == current_user_id {
-            return self.allow_self;
+        if message.author.id == self.current_user_id {
+            return self.policy.allow_self;
         }
 
         // 2. webhook (excluding self)
         if message.webhook_id.is_some() {
-            return self.allow_webhook;
+            return self.policy.allow_webhook;
         }
 
         // 3. system (excluding self and webhooks)
         if message.author.system {
-            return self.allow_system;
+            return self.policy.allow_system;
         }
 
         // 4. bot (excluding self and webhooks)
         // Note: Discord webhooks have author.bot = true, but are classified as 'webhook' above
         if message.author.bot {
-            return self.allow_bot;
+            return self.policy.allow_bot;
         }
 
         // 5. user (default)
-        self.allow_user
+        self.policy.allow_user
     }
 }
 
@@ -136,38 +156,38 @@ mod tests {
     #[case("user,bot,webhook", false, true, false, true, true)]
     #[case("user , bot , webhook", false, true, false, true, true)]
     fn test_policy_parsing(
-        #[case] policy: &str,
+        #[case] policy_str: &str,
         #[case] expect_self: bool,
         #[case] expect_webhook: bool,
         #[case] expect_system: bool,
         #[case] expect_bot: bool,
         #[case] expect_user: bool,
     ) {
-        let filter = MessageFilter::from_policy(policy);
+        let policy = MessageFilterPolicy::from_policy(policy_str);
         assert_eq!(
-            filter.allow_self, expect_self,
+            policy.allow_self, expect_self,
             "allow_self mismatch for policy: '{}'",
-            policy
+            policy_str
         );
         assert_eq!(
-            filter.allow_webhook, expect_webhook,
+            policy.allow_webhook, expect_webhook,
             "allow_webhook mismatch for policy: '{}'",
-            policy
+            policy_str
         );
         assert_eq!(
-            filter.allow_system, expect_system,
+            policy.allow_system, expect_system,
             "allow_system mismatch for policy: '{}'",
-            policy
+            policy_str
         );
         assert_eq!(
-            filter.allow_bot, expect_bot,
+            policy.allow_bot, expect_bot,
             "allow_bot mismatch for policy: '{}'",
-            policy
+            policy_str
         );
         assert_eq!(
-            filter.allow_user, expect_user,
+            policy.allow_user, expect_user,
             "allow_user mismatch for policy: '{}'",
-            policy
+            policy_str
         );
     }
 }
