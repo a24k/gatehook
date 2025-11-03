@@ -85,8 +85,8 @@ impl MessageFilterPolicy {
         }
     }
 
-    /// Create an active filter with the bot's user ID
-    pub fn with_user_id(&self, current_user_id: UserId) -> MessageFilter {
+    /// Create a MessageFilter for a specific user ID
+    pub fn for_user(&self, current_user_id: UserId) -> MessageFilter {
         MessageFilter::new(current_user_id, self.clone())
     }
 }
@@ -94,7 +94,7 @@ impl MessageFilterPolicy {
 /// Active message filter with bot's user ID
 ///
 /// This is created after the bot connects to Discord and knows its user ID.
-/// Can only be created via `MessageFilterPolicy::with_user_id()`.
+/// Can only be created via `MessageFilterPolicy::for_user()`.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
     current_user_id: UserId,
@@ -104,7 +104,7 @@ pub struct MessageFilter {
 impl MessageFilter {
     /// Create a new MessageFilter (private constructor)
     ///
-    /// This is intentionally not public. Use `MessageFilterPolicy::with_user_id()` instead.
+    /// This is intentionally not public. Use `MessageFilterPolicy::for_user()` instead.
     pub(super) fn new(current_user_id: UserId, policy: MessageFilterPolicy) -> Self {
         Self {
             current_user_id,
