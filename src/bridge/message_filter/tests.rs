@@ -1,6 +1,6 @@
 use serenity::model::id::UserId;
 
-use super::message_like::FilterableMessage;
+use super::filterable_message::FilterableMessage;
 
 /// Mock message implementation for unit testing
 #[derive(Debug)]

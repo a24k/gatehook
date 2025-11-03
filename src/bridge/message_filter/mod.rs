@@ -1,5 +1,5 @@
 mod filter;
-mod message_like;
+mod filterable_message;
 mod policy;
 
 #[cfg(test)]

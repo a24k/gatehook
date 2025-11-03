@@ -25,7 +25,12 @@ src/
 │   └── mod.rs
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic
-    ├── message_filter.rs   # Message filtering by sender type
+    ├── message_filter/     # Message filtering by sender type
+    │   ├── mod.rs              # Public API re-exports
+    │   ├── policy.rs           # MessageFilterPolicy (startup parsing)
+    │   ├── filter.rs           # MessageFilter (runtime filtering)
+    │   ├── filterable_message.rs # FilterableMessage trait
+    │   └── tests.rs            # Shared test helpers (MockMessage)
     └── mod.rs
 
 tests/
@@ -59,17 +64,21 @@ Business logic that orchestrates adapters:
   - Implements ping-pong logic and event forwarding
   - Fully testable with mocks
 
-- **`MessageFilter`**: Filters messages based on sender type
-  - Sender type classification (mutually exclusive categories)
-  - Policy-based filtering from environment variable strings
-  - Supports: self, webhook, system, bot, user
+- **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
+  - **`MessageFilterPolicy`**: Parsed at startup from environment variables via serde
+  - **`MessageFilter`**: Created in `ready` event with bot's user_id for runtime filtering
+  - **`FilterableMessage`**: Trait abstraction for testing without serenity's Message type
+  - **`MockMessage`**: Shared test helper for unit tests
+  - Sender type classification (mutually exclusive categories): self, webhook, system, bot, user
+  - Tests colocated with modules using rstest for parameterized testing
 
 ### Application Layer (`src/main.rs`)
 Entry point that wires everything together:
 
 - `Handler`: Thin adapter implementing serenity's `EventHandler`
 - Passes `ctx.http` from Context to bridge (follows serenity's design)
-- Stores `current_user_id` for message filtering
+- Stores `MessageFilter` instances in `OnceLock` for Direct/Guild contexts
+- 2-phase initialization: Policy parsed at startup, Filter created in `ready` event
 - Dynamically builds `GatewayIntents` based on enabled events
 - Currently handles: `ready`, `message` events
 - Applies `MessageFilter` based on message context (Direct/Guild)
@@ -77,10 +86,11 @@ Entry point that wires everything together:
 ## Key Modules
 
 ### `params.rs`
-- `Params` struct: Configuration loaded from environment variables
+- `Params` struct: Configuration loaded from environment variables using serde
 - Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
 - Optional: `INSECURE_MODE`, `RUST_LOG`
 - Event configuration: `MESSAGE_DIRECT`, `MESSAGE_GUILD`, `READY` (all optional)
+  - Parsed into `Option<MessageFilterPolicy>` using custom serde deserializer
 - Helper methods: `has_direct_message_events()`, `has_guild_message_events()`
 
 ### `adapters/http_event_sender.rs`
@@ -93,17 +103,35 @@ Entry point that wires everything together:
 - Generic design enables testing without external dependencies
 - Receives `http` from Context (not stored as state)
 
-### `bridge/message_filter.rs`
-- `MessageFilter`: Implements sender type classification and filtering
-- Policy parsing: `from_policy("user,bot")` → filter configuration
+### `bridge/message_filter/`
+Modular message filtering with 2-phase initialization:
+
+**`policy.rs` - MessageFilterPolicy**
+- Parsed at startup from environment variables using `from_policy("user,bot")`
 - Special values: `"all"` (everything), `""` (everything except self)
-- Filter application: `should_process(&message, current_user_id)` → bool
-- Classification categories (mutually exclusive):
-  - `self` - Bot's own messages
-  - `webhook` - Webhook messages (excluding self)
-  - `system` - System messages (excluding self and webhooks)
-  - `bot` - Other bot messages (excluding self and webhooks)
-  - `user` - Human users (default)
+- Implements `Default` trait (safe default: allow all except self)
+- Creates `MessageFilter` instances via `for_user(current_user_id)` method
+- Tests: policy parsing, Default trait, for_user() method (using rstest)
+
+**`filter.rs` - MessageFilter**
+- Created in `ready` event with bot's `user_id` embedded
+- Runtime filtering via `should_process(&message)` → bool
+- Classification categories (mutually exclusive, priority order):
+  1. `self` - Bot's own messages
+  2. `webhook` - Webhook messages (excluding self)
+  3. `system` - System messages (excluding self and webhooks)
+  4. `bot` - Other bot messages (excluding self and webhooks)
+  5. `user` - Human users (default/fallback)
+- Tests: sender type filtering, priority rules (using rstest)
+
+**`filterable_message.rs` - FilterableMessage**
+- Trait abstraction for message properties needed for filtering
+- Implemented by serenity's `Message` type
+- Enables testing without constructing serenity's non-exhaustive Message struct
+
+**`tests.rs` - Test Helpers**
+- `MockMessage`: Shared test helper with builder pattern
+- Used by tests in both `policy.rs` and `filter.rs`
 
 ## Development Workflow
 
@@ -142,6 +170,11 @@ tests/
 │   ├── mock_event_sender.rs # MockEventSender with SentEvent
 │   └── mod.rs               # Public exports
 └── event_bridge_test.rs     # EventBridge logic tests
+
+src/bridge/message_filter/
+├── policy.rs                # Contains #[cfg(test)] mod tests
+├── filter.rs                # Contains #[cfg(test)] mod tests
+└── tests.rs                 # Shared MockMessage helper
 ```
 
 ### Testing Best Practices
@@ -149,6 +182,8 @@ tests/
 - Tests use dummy `Http` instances (not needed by mocks)
 - Each test creates fresh mock instances (no shared state)
 - Business logic fully testable without external services
+- Unit tests colocated with modules they test
+- Parameterized tests using rstest for reducing duplication
 
 ## Architecture Principles
 
@@ -163,9 +198,13 @@ tests/
 3. **Unit structs for stateless services**: `SerenityDiscordService` has no fields
 4. **Type-safe URLs**: `url::Url` provides early validation
 5. **Environment variable-based event control**: Handlers only registered when configured
-6. **Sender type classification**: Mutually exclusive categories eliminate ambiguity
-7. **Context-aware filtering**: Separate policies for Direct Messages vs Guild messages
-8. **Dynamic Gateway Intents**: Only request permissions for enabled events
+6. **2-phase filter initialization**: Policy at startup, Filter at ready event
+7. **Serde custom deserializers**: Parse filters at config load time
+8. **Sender type classification**: Mutually exclusive categories eliminate ambiguity
+9. **Context-aware filtering**: Separate policies for Direct Messages vs Guild messages
+10. **Dynamic Gateway Intents**: Only request permissions for enabled events
+11. **Trait abstraction for testing**: FilterableMessage enables testing without serenity Message
+12. **Colocated tests**: Unit tests in same file as implementation using `#[cfg(test)]`
 
 ### Future Growth Path
 When complexity increases:
