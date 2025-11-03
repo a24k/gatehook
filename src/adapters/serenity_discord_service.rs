@@ -17,18 +17,10 @@ impl DiscordService for SerenityDiscordService {
     ) -> Result<(), serenity::Error> {
         use serenity::builder::{CreateAllowedMentions, CreateMessage};
 
-        let mut builder = CreateMessage::new()
+        let builder = CreateMessage::new()
             .content(content)
-            .reference_message((channel_id, message_id));
-
-        // Configure mention settings
-        if mention {
-            // Enable mention notification (ping the user)
-            builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(true));
-        } else {
-            // Disable mention notification (no ping)
-            builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(false));
-        }
+            .reference_message((channel_id, message_id))
+            .allowed_mentions(CreateAllowedMentions::new().replied_user(mention));
 
         channel_id.send_message(http, builder).await?;
         Ok(())
