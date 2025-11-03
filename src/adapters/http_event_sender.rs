@@ -3,7 +3,7 @@ use super::event_sender_trait::EventSender;
 use anyhow::Context as _;
 use serde::Serialize;
 use serenity::async_trait;
-use tracing::{debug, info, warn};
+use tracing::{error, info, warn};
 use url::Url;
 
 /// Implementation for sending events via HTTP
@@ -64,34 +64,32 @@ impl EventSender for HttpEventSender {
                         %status,
                         %handler,
                         actions = action_count,
-                        "Received webhook response with actions"
+                        "HTTP endpoint returned success status, response body parsed"
                     );
                 } else {
                     warn!(
                         %status,
                         %handler,
                         actions = action_count,
-                        "Webhook returned non-success status but included actions"
+                        "HTTP endpoint returned non-success status, response body parsed"
                     );
                 }
                 Ok(Some(event_response))
             }
             Err(err) => {
                 if status.is_success() {
-                    // Success status but cannot parse - warning
-                    warn!(
+                    error!(
                         ?err,
                         %status,
                         %handler,
-                        "Webhook returned success but response body could not be parsed as JSON"
+                        "HTTP endpoint returned success status, response body could not be parsed"
                     );
                 } else {
-                    // Error status and cannot parse - debug log
-                    debug!(
+                    error!(
                         ?err,
                         %status,
                         %handler,
-                        "Webhook returned error status and no parseable response"
+                        "HTTP endpoint returned non-success status, response body could not be parsed"
                     );
                 }
                 Ok(None)
