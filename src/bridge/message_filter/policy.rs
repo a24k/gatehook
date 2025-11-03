@@ -91,3 +91,89 @@ impl MessageFilterPolicy {
         MessageFilter::new(current_user_id, self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("all", true, true, true, true, true)]
+    #[case("", false, true, true, true, true)]
+    #[case("user", false, false, false, false, true)]
+    #[case("bot", false, false, false, true, false)]
+    #[case("webhook", false, true, false, false, false)]
+    #[case("system", false, false, true, false, false)]
+    #[case("self", true, false, false, false, false)]
+    #[case("user,bot", false, false, false, true, true)]
+    #[case("user,bot,webhook", false, true, false, true, true)]
+    #[case("user , bot , webhook", false, true, false, true, true)]
+    fn test_policy_parsing(
+        #[case] policy_str: &str,
+        #[case] expect_self: bool,
+        #[case] expect_webhook: bool,
+        #[case] expect_system: bool,
+        #[case] expect_bot: bool,
+        #[case] expect_user: bool,
+    ) {
+        let policy = MessageFilterPolicy::from_policy(policy_str);
+        assert_eq!(
+            policy.allow_self, expect_self,
+            "allow_self mismatch for policy: '{}'",
+            policy_str
+        );
+        assert_eq!(
+            policy.allow_webhook, expect_webhook,
+            "allow_webhook mismatch for policy: '{}'",
+            policy_str
+        );
+        assert_eq!(
+            policy.allow_system, expect_system,
+            "allow_system mismatch for policy: '{}'",
+            policy_str
+        );
+        assert_eq!(
+            policy.allow_bot, expect_bot,
+            "allow_bot mismatch for policy: '{}'",
+            policy_str
+        );
+        assert_eq!(
+            policy.allow_user, expect_user,
+            "allow_user mismatch for policy: '{}'",
+            policy_str
+        );
+    }
+
+    #[test]
+    fn test_default_policy() {
+        let policy = MessageFilterPolicy::default();
+        assert!(!policy.allow_self, "Default should block self");
+        assert!(policy.allow_webhook, "Default should allow webhook");
+        assert!(policy.allow_system, "Default should allow system");
+        assert!(policy.allow_bot, "Default should allow bot");
+        assert!(policy.allow_user, "Default should allow user");
+    }
+
+    #[test]
+    fn test_for_user_creates_filter() {
+        use super::super::tests::MockMessage;
+
+        let policy = MessageFilterPolicy::from_policy("user,bot");
+        let user_id = UserId::new(12345);
+
+        let filter = policy.for_user(user_id);
+
+        // Verify filter is created with correct user_id (tested via should_process)
+        let self_message = MockMessage::new(12345);
+        assert!(
+            !filter.should_process(&self_message),
+            "Should block self messages"
+        );
+
+        let user_message = MockMessage::new(67890);
+        assert!(
+            filter.should_process(&user_message),
+            "Should allow user messages"
+        );
+    }
+}
