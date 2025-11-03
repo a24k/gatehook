@@ -206,7 +206,7 @@ src/bridge/message_filter/
 - Each test creates fresh mock instances (no shared state)
 - Business logic fully testable without external services
 - Unit tests colocated with modules they test
-- Parameterized tests using rstest for reducing duplication
+- **Use rstest for parameterized tests**: When multiple test cases share identical logic but differ only in inputs/outputs, use rstest to reduce duplication (e.g., `message_filter` tests, `event_response` tests)
 
 ## Architecture Principles
 

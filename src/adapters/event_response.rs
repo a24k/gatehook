@@ -39,45 +39,44 @@ pub enum Action {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_parse_empty_response() {
-        let json = r#"{}"#;
+    #[rstest]
+    #[case::empty_object(r#"{}"#, 0)]
+    #[case::empty_array(r#"{"actions": []}"#, 0)]
+    fn test_parse_empty_response(#[case] json: &str, #[case] expected_len: usize) {
         let response: EventResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.actions.len(), 0);
+        assert_eq!(response.actions.len(), expected_len);
     }
 
-    #[test]
-    fn test_parse_empty_actions() {
-        let json = r#"{"actions": []}"#;
-        let response: EventResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.actions.len(), 0);
-    }
-
-    #[test]
-    fn test_parse_reply_without_mention() {
-        let json = r#"{"actions":[{"type":"reply","content":"Hello"}]}"#;
+    #[rstest]
+    #[case::without_mention(
+        r#"{"actions":[{"type":"reply","content":"Hello"}]}"#,
+        "Hello",
+        false
+    )]
+    #[case::with_mention(
+        r#"{"actions":[{"type":"reply","content":"Hi there","mention":true}]}"#,
+        "Hi there",
+        true
+    )]
+    #[case::explicit_false_mention(
+        r#"{"actions":[{"type":"reply","content":"Test","mention":false}]}"#,
+        "Test",
+        false
+    )]
+    fn test_parse_single_reply_action(
+        #[case] json: &str,
+        #[case] expected_content: &str,
+        #[case] expected_mention: bool,
+    ) {
         let response: EventResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
             Action::Reply { content, mention } => {
-                assert_eq!(content, "Hello");
-                assert!(!mention);
-            }
-        }
-    }
-
-    #[test]
-    fn test_parse_reply_with_mention() {
-        let json = r#"{"actions":[{"type":"reply","content":"Hi there","mention":true}]}"#;
-        let response: EventResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.actions.len(), 1);
-
-        match &response.actions[0] {
-            Action::Reply { content, mention } => {
-                assert_eq!(content, "Hi there");
-                assert!(mention);
+                assert_eq!(content, expected_content);
+                assert_eq!(*mention, expected_mention);
             }
         }
     }
