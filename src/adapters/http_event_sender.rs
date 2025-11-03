@@ -1,8 +1,9 @@
+use super::event_response::EventResponse;
 use super::event_sender_trait::EventSender;
 use anyhow::Context as _;
 use serde::Serialize;
 use serenity::async_trait;
-use tracing::{error, info};
+use tracing::info;
 use url::Url;
 
 /// HTTP経由でイベントを送信する実装
@@ -43,31 +44,57 @@ impl EventSender for HttpEventSender {
         &self,
         handler: &str,
         payload: &T,
-    ) -> anyhow::Result<()> {
-        match self
+    ) -> anyhow::Result<Option<EventResponse>> {
+        let response = self
             .client
             .post(self.endpoint.clone())
             .query(&[("handler", handler)])
             .json(payload)
             .send()
-            .await
-        {
-            Ok(response) => {
-                info!(
-                    status = %response.status(),
-                    handler = %handler,
-                    "Successfully sent event to webhook"
-                );
-                Ok(())
+            .await?;
+
+        let status = response.status();
+
+        // ステータスコードに関わらず、ボディのパースを試行
+        match response.json::<EventResponse>().await {
+            Ok(event_response) => {
+                let action_count = event_response.actions.len();
+                if status.is_success() {
+                    info!(
+                        %status,
+                        %handler,
+                        actions = action_count,
+                        "Received webhook response with actions"
+                    );
+                } else {
+                    tracing::warn!(
+                        %status,
+                        %handler,
+                        actions = action_count,
+                        "Webhook returned non-success status but included actions"
+                    );
+                }
+                Ok(Some(event_response))
             }
             Err(err) => {
-                error!(
-                    error = ?err,
-                    handler = %handler,
-                    endpoint = %self.endpoint,
-                    "Failed to send event to webhook"
-                );
-                Err(err.into())
+                if status.is_success() {
+                    // 成功ステータスなのにパースできない → 警告
+                    tracing::warn!(
+                        ?err,
+                        %status,
+                        %handler,
+                        "Webhook returned success but response body could not be parsed as JSON"
+                    );
+                } else {
+                    // エラーステータスでパースもできない → デバッグログ
+                    tracing::debug!(
+                        ?err,
+                        %status,
+                        %handler,
+                        "Webhook returned error status and no parseable response"
+                    );
+                }
+                Ok(None)
             }
         }
     }

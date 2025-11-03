@@ -1,4 +1,4 @@
-use gatehook::adapters::EventSender;
+use gatehook::adapters::{EventResponse, EventSender};
 use serde::Serialize;
 use serde_json;
 use serenity::async_trait;
@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct MockEventSender {
     pub sent_events: Arc<Mutex<Vec<SentEvent>>>,
+    pub response: Option<EventResponse>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +26,15 @@ impl MockEventSender {
     pub fn new() -> Self {
         Self {
             sent_events: Arc::new(Mutex::new(Vec::new())),
+            response: None,
+        }
+    }
+
+    /// テスト用: 応答を設定したMockEventSenderを作成
+    pub fn with_response(response: EventResponse) -> Self {
+        Self {
+            sent_events: Arc::new(Mutex::new(Vec::new())),
+            response: Some(response),
         }
     }
 
@@ -39,12 +49,12 @@ impl EventSender for MockEventSender {
         &self,
         handler: &str,
         payload: &T,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<EventResponse>> {
         let payload_json = serde_json::to_string(payload)?;
         self.sent_events.lock().unwrap().push(SentEvent {
             handler: handler.to_string(),
             payload: payload_json,
         });
-        Ok(())
+        Ok(self.response.clone())
     }
 }

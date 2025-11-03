@@ -12,6 +12,7 @@ pub struct RecordedReply {
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub content: String,
+    pub mention: bool,
 }
 
 impl Default for MockDiscordService {
@@ -40,11 +41,13 @@ impl DiscordService for MockDiscordService {
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,
+        mention: bool,
     ) -> Result<(), serenity::Error> {
         self.replies.lock().unwrap().push(RecordedReply {
             channel_id,
             message_id,
             content: content.to_string(),
+            mention,
         });
         Ok(())
     }

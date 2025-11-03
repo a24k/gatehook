@@ -101,8 +101,24 @@ impl EventHandler for Handler {
             return;
         }
 
-        if let Err(e) = self.bridge.handle_message(&ctx.http, &message).await {
-            error!(error = ?e, "Failed to handle message event");
+        // イベント処理（Webhook送信 + アクション実行）
+        match self.bridge.handle_message(&ctx.http, &message).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                // Webhookから応答があり、アクションが含まれる場合は実行
+                if let Err(err) = self
+                    .bridge
+                    .execute_actions(&ctx.http, &message, &event_response)
+                    .await
+                {
+                    error!(?err, "Failed to execute actions from webhook response");
+                }
+            }
+            Ok(_) => {
+                // 応答なし、または空のアクション → 正常終了
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle message event");
+            }
         }
     }
 }
