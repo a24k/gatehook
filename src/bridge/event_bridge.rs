@@ -3,7 +3,7 @@ use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::{debug, error, info, warn};
 
 /// Bridge Discord Gateway events to external endpoints
 pub struct EventBridge<D, S>
@@ -146,7 +146,7 @@ where
             let truncated: String = content.chars().take(1997).collect();
             let truncated = format!("{}...", truncated);
 
-            tracing::warn!(
+            warn!(
                 original_len = content.chars().count(),
                 truncated_len = truncated.chars().count(),
                 "Reply content exceeds 2000 chars, truncated"
@@ -162,7 +162,7 @@ where
             .await
             .context("Failed to send reply to Discord")?;
 
-        debug!(
+        info!(
             message_id = %message.id,
             mention = mention,
             content_len = content.chars().count(),
