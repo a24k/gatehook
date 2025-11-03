@@ -22,7 +22,7 @@ src/
 │   ├── serenity_discord_service.rs  # Serenity implementation
 │   ├── event_sender_trait.rs        # Event sending trait
 │   ├── http_event_sender.rs         # HTTP implementation
-│   ├── event_response.rs            # Webhook response types (EventResponse, Action)
+│   ├── event_response.rs            # Webhook response types (EventResponse, ResponseAction)
 │   └── mod.rs
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic + action execution
@@ -58,9 +58,9 @@ External service abstractions and implementations:
   - `HttpEventSender`: Sends events to HTTP endpoints, parses JSON responses
   - `MockEventSender` (tests): Records sent events, can return pre-configured responses
 
-- **`EventResponse` and `Action` types**: Webhook response structure
+- **`EventResponse` and `ResponseAction` types**: Webhook response structure
   - `EventResponse`: Container for action list from webhook
-  - `Action` enum: Represents Discord operations (Reply, React, etc.)
+  - `ResponseAction` enum: Represents Discord operations (Reply, React, etc.)
   - Deserialized from webhook's JSON response
 
 ### Bridge Layer (`src/bridge/`)
@@ -111,8 +111,8 @@ Entry point that wires everything together:
 - **Response handling**: Parses `EventResponse` from JSON, handles non-2xx status codes gracefully
 
 ### `adapters/event_response.rs`
-- `EventResponse`: Webhook response container with `actions: Vec<Action>`
-- `Action` enum: Tagged union of Discord operations
+- `EventResponse`: Webhook response container with `actions: Vec<ResponseAction>`
+- `ResponseAction` enum: Tagged union of Discord operations
   - `Reply { content: String, mention: bool }`: Reply to message
   - Future: React, CreateThread, SendToChannel, etc.
 - Uses serde with `#[serde(tag = "type")]` for type-safe deserialization
