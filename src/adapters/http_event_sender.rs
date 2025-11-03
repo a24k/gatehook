@@ -3,7 +3,7 @@ use super::event_sender_trait::EventSender;
 use anyhow::Context as _;
 use serde::Serialize;
 use serenity::async_trait;
-use tracing::info;
+use tracing::{debug, info, warn};
 use url::Url;
 
 /// Implementation for sending events via HTTP
@@ -67,7 +67,7 @@ impl EventSender for HttpEventSender {
                         "Received webhook response with actions"
                     );
                 } else {
-                    tracing::warn!(
+                    warn!(
                         %status,
                         %handler,
                         actions = action_count,
@@ -79,7 +79,7 @@ impl EventSender for HttpEventSender {
             Err(err) => {
                 if status.is_success() {
                     // Success status but cannot parse - warning
-                    tracing::warn!(
+                    warn!(
                         ?err,
                         %status,
                         %handler,
@@ -87,7 +87,7 @@ impl EventSender for HttpEventSender {
                     );
                 } else {
                     // Error status and cannot parse - debug log
-                    tracing::debug!(
+                    debug!(
                         ?err,
                         %status,
                         %handler,
