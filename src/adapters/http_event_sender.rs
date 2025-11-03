@@ -6,7 +6,7 @@ use serenity::async_trait;
 use tracing::info;
 use url::Url;
 
-/// HTTP経由でイベントを送信する実装
+/// Implementation for sending events via HTTP
 pub struct HttpEventSender {
     client: reqwest::Client,
     endpoint: Url,
@@ -55,7 +55,7 @@ impl EventSender for HttpEventSender {
 
         let status = response.status();
 
-        // ステータスコードに関わらず、ボディのパースを試行
+        // Try to parse the body regardless of status code
         match response.json::<EventResponse>().await {
             Ok(event_response) => {
                 let action_count = event_response.actions.len();
@@ -78,7 +78,7 @@ impl EventSender for HttpEventSender {
             }
             Err(err) => {
                 if status.is_success() {
-                    // 成功ステータスなのにパースできない → 警告
+                    // Success status but cannot parse - warning
                     tracing::warn!(
                         ?err,
                         %status,
@@ -86,7 +86,7 @@ impl EventSender for HttpEventSender {
                         "Webhook returned success but response body could not be parsed as JSON"
                     );
                 } else {
-                    // エラーステータスでパースもできない → デバッグログ
+                    // Error status and cannot parse - debug log
                     tracing::debug!(
                         ?err,
                         %status,

@@ -1,7 +1,7 @@
 use serenity::async_trait;
 use serenity::model::id::{ChannelId, MessageId};
 
-/// Discord操作のインターフェース
+/// Interface for Discord operations
 #[async_trait]
 pub trait DiscordService: Send + Sync {
     /// Reply to a message in a channel

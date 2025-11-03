@@ -4,7 +4,7 @@ use serenity::model::gateway::Ready;
 use std::sync::Arc;
 use tracing::{debug, error};
 
-/// Discord Gateway イベントを外部エンドポイントに橋渡しする
+/// Bridge Discord Gateway events to external endpoints
 pub struct EventBridge<D, S>
 where
     D: DiscordService,
@@ -34,8 +34,8 @@ where
 
     /// Handle a message event
     ///
-    /// イベントをWebhookに送信し、応答を返す。
-    /// 既存のビジネスロジック（Ping!への応答）も実行する。
+    /// Sends event to webhook and returns the response.
+    /// Also executes existing business logic (Ping! response).
     ///
     /// # Arguments
     ///
@@ -44,7 +44,7 @@ where
     ///
     /// # Returns
     ///
-    /// Webhookからの応答（アクションを含む場合がある）
+    /// Response from webhook (may contain actions)
     pub async fn handle_message(
         &self,
         http: &serenity::http::Http,
@@ -88,7 +88,7 @@ where
         Ok(())
     }
 
-    /// Webhookからの応答に含まれるアクションを実行
+    /// Execute actions from webhook response
     ///
     /// # Arguments
     ///
@@ -102,7 +102,7 @@ where
         event_response: &EventResponse,
     ) -> anyhow::Result<()> {
         for action in &event_response.actions {
-            // アクション実行（エラーはログ記録して継続）
+            // Execute action (log error and continue with next)
             if let Err(err) = self.execute_action(http, message, action).await {
                 error!(?err, ?action, "Failed to execute action, continuing with next");
             }

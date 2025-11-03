@@ -2,7 +2,7 @@ use super::discord_service::DiscordService;
 use serenity::async_trait;
 use serenity::model::id::{ChannelId, MessageId};
 
-/// Serenity経由でDiscord操作を行う実装
+/// Implementation for Discord operations via Serenity
 pub struct SerenityDiscordService;
 
 #[async_trait]
@@ -21,12 +21,12 @@ impl DiscordService for SerenityDiscordService {
             .content(content)
             .reference_message((channel_id, message_id));
 
-        // メンション設定
+        // Configure mention settings
         if mention {
-            // メンション通知を有効にする
+            // Enable mention notification
             builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(true));
         } else {
-            // メンション通知を無効にする（デフォルト）
+            // Disable mention notification (default)
             builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(false));
         }
 

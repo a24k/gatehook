@@ -2,21 +2,21 @@ use crate::adapters::event_response::EventResponse;
 use serde::Serialize;
 use serenity::async_trait;
 
-/// イベントを外部エンドポイントに送信するインターフェース
+/// Interface for sending events to external endpoints
 #[async_trait]
 pub trait EventSender: Send + Sync {
-    /// イベントを送信し、応答を取得
+    /// Send an event and receive response
     ///
     /// # Arguments
     ///
-    /// * `handler` - ハンドラ名 (e.g., "message", "ready")
-    /// * `payload` - 送信するペイロード（JSONにシリアライズされる）
+    /// * `handler` - Handler name (e.g., "message", "ready")
+    /// * `payload` - Payload to send (will be serialized to JSON)
     ///
     /// # Returns
     ///
-    /// * `Ok(Some(EventResponse))` - 応答が正常にパースできた場合
-    /// * `Ok(None)` - 応答がない、またはパースできない場合
-    /// * `Err(_)` - 送信に失敗した場合
+    /// * `Ok(Some(EventResponse))` - Response was successfully parsed
+    /// * `Ok(None)` - No response or response could not be parsed
+    /// * `Err(_)` - Failed to send the request
     async fn send<T: Serialize + Send + Sync>(
         &self,
         handler: &str,
