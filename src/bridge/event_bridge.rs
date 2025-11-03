@@ -1,4 +1,5 @@
 use crate::adapters::{DiscordService, EventResponse, EventSender, ResponseAction};
+use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
@@ -68,7 +69,10 @@ where
         }
 
         // Forward event to webhook endpoint and return response
-        self.event_sender.send("message", message).await
+        self.event_sender
+            .send("message", message)
+            .await
+            .context("Failed to send message event to HTTP endpoint")
     }
 
     /// Handle a ready event
@@ -83,7 +87,10 @@ where
         );
 
         // Forward event to webhook endpoint
-        self.event_sender.send("ready", ready).await?;
+        self.event_sender
+            .send("ready", ready)
+            .await
+            .context("Failed to send ready event to HTTP endpoint")?;
 
         Ok(())
     }
@@ -151,7 +158,7 @@ where
         self.discord_service
             .reply_to_message(http, message.channel_id, message.id, &content, mention)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send reply: {}", e))?;
+            .context("Failed to send reply to Discord")?;
 
         debug!(
             message_id = %message.id,
