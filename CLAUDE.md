@@ -22,9 +22,10 @@ src/
 │   ├── serenity_discord_service.rs  # Serenity implementation
 │   ├── event_sender_trait.rs        # Event sending trait
 │   ├── http_event_sender.rs         # HTTP implementation
+│   ├── event_response.rs            # Webhook response types (EventResponse, ResponseAction)
 │   └── mod.rs
 └── bridge/                 # Business logic layer
-    ├── event_bridge.rs     # Event processing logic
+    ├── event_bridge.rs     # Event processing logic + action execution
     ├── message_filter/     # Message filtering by sender type
     │   ├── mod.rs              # Public API re-exports
     │   ├── policy.rs           # MessageFilterPolicy (startup parsing)
@@ -38,7 +39,7 @@ tests/
 │   ├── mock_discord.rs
 │   ├── mock_event_sender.rs
 │   └── mod.rs
-└── event_bridge_test.rs    # Integration tests
+└── event_bridge_test.rs    # Integration tests (includes action execution tests)
 ```
 
 ## Architecture
@@ -53,8 +54,14 @@ External service abstractions and implementations:
   - `MockDiscordService` (tests): Records calls for verification
 
 - **`EventSender` trait**: Abstracts event forwarding
-  - `HttpEventSender`: Sends events to HTTP endpoints
-  - `MockEventSender` (tests): Records sent events
+  - Returns `Option<EventResponse>` containing webhook's response actions
+  - `HttpEventSender`: Sends events to HTTP endpoints, parses JSON responses
+  - `MockEventSender` (tests): Records sent events, can return pre-configured responses
+
+- **`EventResponse` and `ResponseAction` types**: Webhook response structure
+  - `EventResponse`: Container for action list from webhook
+  - `ResponseAction` enum: Represents Discord operations (Reply, React, etc.)
+  - Deserialized from webhook's JSON response
 
 ### Bridge Layer (`src/bridge/`)
 Business logic that orchestrates adapters:
@@ -62,6 +69,9 @@ Business logic that orchestrates adapters:
 - **`EventBridge`**: Coordinates Discord and HTTP operations
   - Generic over `DiscordService` and `EventSender` traits
   - Implements ping-pong logic and event forwarding
+  - **Action execution**: Processes webhook response actions
+    - `execute_actions()`: Iterates through actions, logs errors, continues on failure
+    - `execute_reply()`: Handles reply action with 2000 char truncation
   - Fully testable with mocks
 
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
@@ -82,6 +92,7 @@ Entry point that wires everything together:
 - Dynamically builds `GatewayIntents` based on enabled events
 - Currently handles: `ready`, `message` events
 - Applies `MessageFilter` based on message context (Direct/Guild)
+- **Webhook action flow**: `handle_message` → webhook response → `execute_actions`
 
 ## Key Modules
 
@@ -94,14 +105,26 @@ Entry point that wires everything together:
 - Helper methods: `has_direct_message_events()`, `has_guild_message_events()`
 
 ### `adapters/http_event_sender.rs`
-- `HttpEventSender`: Sends events to HTTP endpoints
+- `HttpEventSender`: Sends events to HTTP endpoints and parses responses
 - Uses `url::Url` type for early URL validation
 - Configurable TLS certificate validation (insecure mode for testing)
+- **Response handling**: Parses `EventResponse` from JSON, handles non-2xx status codes gracefully
+
+### `adapters/event_response.rs`
+- `EventResponse`: Webhook response container with `actions: Vec<ResponseAction>`
+- `ResponseAction` enum: Tagged union of Discord operations
+  - `Reply { content: String, mention: bool }`: Reply to message
+  - Future: React, CreateThread, SendToChannel, etc.
+- Uses serde with `#[serde(tag = "type")]` for type-safe deserialization
 
 ### `bridge/event_bridge.rs`
 - `EventBridge`: Core business logic
 - Generic design enables testing without external dependencies
 - Receives `http` from Context (not stored as state)
+- **Action execution**:
+  - Sequential processing of actions (preserves order)
+  - Error isolation (one failure doesn't stop others)
+  - Content truncation (2000 char limit for Discord messages)
 
 ### `bridge/message_filter/`
 Modular message filtering with 2-phase initialization:
@@ -183,7 +206,7 @@ src/bridge/message_filter/
 - Each test creates fresh mock instances (no shared state)
 - Business logic fully testable without external services
 - Unit tests colocated with modules they test
-- Parameterized tests using rstest for reducing duplication
+- **Use rstest for parameterized tests**: When multiple test cases share identical logic but differ only in inputs/outputs, use rstest to reduce duplication (e.g., `message_filter` tests, `event_response` tests)
 
 ## Architecture Principles
 

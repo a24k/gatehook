@@ -149,6 +149,110 @@ Events are forwarded to your HTTP endpoint as JSON POST requests:
 }
 ```
 
+## Webhook Response Actions
+
+Your HTTP endpoint can respond with actions for gatehook to execute on Discord. This enables bidirectional communication - your webhook receives events and can instruct gatehook to reply, react, or perform other Discord operations.
+
+### Response Format
+
+Return a JSON object with an `actions` array:
+
+```json
+{
+  "actions": [
+    {
+      "type": "reply",
+      "content": "Hello! I received your message.",
+      "mention": false
+    }
+  ]
+}
+```
+
+### Available Actions
+
+#### `reply` - Reply to Message
+
+Reply to the message that triggered the event.
+
+**Available in:** `message` handler only
+
+```json
+{
+  "type": "reply",
+  "content": "Your reply text here",
+  "mention": false
+}
+```
+
+**Parameters:**
+- `content` (string, required): Reply text (max 2000 Unicode codepoints, auto-truncated if exceeded)
+- `mention` (boolean, optional, default: `false`): Whether to ping/notify the original message author
+
+**Examples:**
+
+```json
+// Simple reply without notification
+{
+  "type": "reply",
+  "content": "Got it! Processing your request...",
+  "mention": false
+}
+
+// Reply with notification
+{
+  "type": "reply",
+  "content": "⚠️ Important: Your request requires attention!",
+  "mention": true
+}
+
+// Long content (automatically truncated to 2000 chars)
+{
+  "type": "reply",
+  "content": "Very long text... (will be truncated to 1997 chars + '...')",
+  "mention": false
+}
+```
+
+### Multiple Actions
+
+Execute multiple actions in sequence:
+
+```json
+{
+  "actions": [
+    {
+      "type": "reply",
+      "content": "Processing your request...",
+      "mention": false
+    },
+    {
+      "type": "reply",
+      "content": "Done! ✓",
+      "mention": true
+    }
+  ]
+}
+```
+
+### Error Handling
+
+- **Non-2xx HTTP Status**: Actions are still executed if present in response body
+- **Invalid JSON**: Logged as warning, no actions executed
+- **Action Execution Failure**: Logged as error, remaining actions continue
+- **Content Too Long**: Automatically truncated to 2000 chars with "..." suffix
+
+### Empty or No Response
+
+If your endpoint returns an empty response or no `actions` field, no actions are executed:
+
+```json
+{}
+// or
+{"actions": []}
+// Both are valid and result in no action
+```
+
 ## Gateway Intents Support
 
 [Discord Developer Portal - List of Intents](https://discord.com/developers/docs/events/gateway#list-of-intents)

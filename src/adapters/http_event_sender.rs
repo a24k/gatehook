@@ -1,11 +1,12 @@
+use super::event_response::EventResponse;
 use super::event_sender_trait::EventSender;
 use anyhow::Context as _;
 use serde::Serialize;
 use serenity::async_trait;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use url::Url;
 
-/// HTTP経由でイベントを送信する実装
+/// Implementation for sending events via HTTP
 pub struct HttpEventSender {
     client: reqwest::Client,
     endpoint: Url,
@@ -43,31 +44,55 @@ impl EventSender for HttpEventSender {
         &self,
         handler: &str,
         payload: &T,
-    ) -> anyhow::Result<()> {
-        match self
+    ) -> anyhow::Result<Option<EventResponse>> {
+        let response = self
             .client
             .post(self.endpoint.clone())
             .query(&[("handler", handler)])
             .json(payload)
             .send()
-            .await
-        {
-            Ok(response) => {
-                info!(
-                    status = %response.status(),
-                    handler = %handler,
-                    "Successfully sent event to webhook"
-                );
-                Ok(())
+            .await?;
+
+        let status = response.status();
+
+        // Try to parse the body regardless of status code
+        match response.json::<EventResponse>().await {
+            Ok(event_response) => {
+                let action_count = event_response.actions.len();
+                if status.is_success() {
+                    info!(
+                        %handler,
+                        %status,
+                        actions = action_count,
+                        "HTTP endpoint returned success status, response body parsed"
+                    );
+                } else {
+                    warn!(
+                        %handler,
+                        %status,
+                        actions = action_count,
+                        "HTTP endpoint returned non-success status, response body parsed"
+                    );
+                }
+                Ok(Some(event_response))
             }
             Err(err) => {
-                error!(
-                    error = ?err,
-                    handler = %handler,
-                    endpoint = %self.endpoint,
-                    "Failed to send event to webhook"
-                );
-                Err(err.into())
+                if status.is_success() {
+                    error!(
+                        ?err,
+                        %handler,
+                        %status,
+                        "HTTP endpoint returned success status, response body could not be parsed"
+                    );
+                } else {
+                    error!(
+                        ?err,
+                        %handler,
+                        %status,
+                        "HTTP endpoint returned non-success status, response body could not be parsed"
+                    );
+                }
+                Ok(None)
             }
         }
     }

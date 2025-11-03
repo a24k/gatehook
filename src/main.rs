@@ -76,8 +76,22 @@ impl EventHandler for Handler {
             return;
         }
 
-        if let Err(e) = self.bridge.handle_ready(&ready).await {
-            error!(error = ?e, "Failed to handle ready event");
+        // Handle event (send to webhook + execute actions if needed)
+        match self.bridge.handle_ready(&ready).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                // Currently ready event doesn't have associated message context,
+                // so we log and skip action execution
+                tracing::warn!(
+                    action_count = event_response.actions.len(),
+                    "Ready event received actions from webhook, but action execution is not supported for ready events"
+                );
+            }
+            Ok(_) => {
+                // No response or empty actions - success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle ready event");
+            }
         }
     }
 
@@ -101,8 +115,24 @@ impl EventHandler for Handler {
             return;
         }
 
-        if let Err(e) = self.bridge.handle_message(&ctx.http, &message).await {
-            error!(error = ?e, "Failed to handle message event");
+        // Handle event (send to webhook + execute actions)
+        match self.bridge.handle_message(&ctx.http, &message).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                // Execute actions if webhook responded with any
+                if let Err(err) = self
+                    .bridge
+                    .execute_actions(&ctx.http, &message, &event_response)
+                    .await
+                {
+                    error!(?err, "Failed to execute actions from webhook response");
+                }
+            }
+            Ok(_) => {
+                // No response or empty actions - success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle message event");
+            }
         }
     }
 }
