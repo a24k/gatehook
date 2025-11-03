@@ -36,11 +36,9 @@ where
     /// Handle a message event
     ///
     /// Sends event to webhook and returns the response.
-    /// Also executes existing business logic (Ping! response).
     ///
     /// # Arguments
     ///
-    /// * `http` - The HTTP client from Context
     /// * `message` - The message event from Discord
     ///
     /// # Returns
@@ -48,7 +46,6 @@ where
     /// Response from webhook (may contain actions)
     pub async fn handle_message(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
     ) -> anyhow::Result<Option<EventResponse>> {
         debug!(
@@ -57,16 +54,6 @@ where
             content = %message.content,
             "Processing message event"
         );
-
-        // Business logic: reply to "Ping!" messages
-        if message.content == "Ping!"
-            && let Err(err) = self
-                .discord_service
-                .reply_to_message(http, message.channel_id, message.id, "Pong!", false)
-                .await
-        {
-            error!(error = ?err, "Failed to send message reply");
-        }
 
         // Forward event to webhook endpoint and return response
         self.event_sender
