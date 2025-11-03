@@ -5,6 +5,8 @@ use serenity::model::id::UserId;
 ///
 /// This represents the filtering rules without being tied to a specific bot user ID.
 /// Can be created at startup before connecting to Discord.
+///
+/// The default policy allows everything except self (safe default for bots).
 #[derive(Debug, Clone)]
 pub struct MessageFilterPolicy {
     allow_self: bool,
@@ -12,6 +14,21 @@ pub struct MessageFilterPolicy {
     allow_system: bool,
     allow_bot: bool,
     allow_user: bool,
+}
+
+impl Default for MessageFilterPolicy {
+    /// Default policy: allow all except self
+    ///
+    /// This is a safe default for bots to avoid processing their own messages.
+    fn default() -> Self {
+        Self {
+            allow_self: false,
+            allow_webhook: true,
+            allow_system: true,
+            allow_bot: true,
+            allow_user: true,
+        }
+    }
 }
 
 impl MessageFilterPolicy {
@@ -35,9 +52,9 @@ impl MessageFilterPolicy {
     pub fn from_policy(policy: &str) -> Self {
         let policy = policy.trim();
 
-        // Empty string = everything except self (safe default)
+        // Empty string = use default (everything except self)
         if policy.is_empty() {
-            return Self::default_allow();
+            return Self::default();
         }
 
         // "all" = everything including self
@@ -68,29 +85,16 @@ impl MessageFilterPolicy {
         }
     }
 
-    /// Default allow (empty string): everything except self
-    pub fn default_allow() -> Self {
-        Self {
-            allow_self: false,
-            allow_webhook: true,
-            allow_system: true,
-            allow_bot: true,
-            allow_user: true,
-        }
-    }
-
     /// Create an active filter with the bot's user ID
     pub fn with_user_id(&self, current_user_id: UserId) -> MessageFilter {
-        MessageFilter {
-            current_user_id,
-            policy: self.clone(),
-        }
+        MessageFilter::new(current_user_id, self.clone())
     }
 }
 
 /// Active message filter with bot's user ID
 ///
 /// This is created after the bot connects to Discord and knows its user ID.
+/// Can only be created via `MessageFilterPolicy::with_user_id()`.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
     current_user_id: UserId,
@@ -98,6 +102,16 @@ pub struct MessageFilter {
 }
 
 impl MessageFilter {
+    /// Create a new MessageFilter (private constructor)
+    ///
+    /// This is intentionally not public. Use `MessageFilterPolicy::with_user_id()` instead.
+    pub(super) fn new(current_user_id: UserId, policy: MessageFilterPolicy) -> Self {
+        Self {
+            current_user_id,
+            policy,
+        }
+    }
+
     /// Check if a message should be processed based on this filter
     ///
     /// # Sender Type Classification
