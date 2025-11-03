@@ -1,12 +1,39 @@
 use anyhow::Context as _;
 use serde::Deserialize;
+use crate::bridge::message_filter::MessageFilterPolicy;
 
-#[derive(Deserialize)]
+/// Deserialize environment variable string into MessageFilterPolicy
+fn deserialize_message_filter_policy<'de, D>(
+    deserializer: D,
+) -> Result<Option<MessageFilterPolicy>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    Ok(s.map(|policy| MessageFilterPolicy::from_policy(&policy)))
+}
+
+#[derive(Deserialize, Clone)]
 pub struct Params {
     #[serde(default)]
     pub insecure_mode: bool,
     pub discord_token: String,
     pub http_endpoint: String,
+
+    // ========================================
+    // Event Configuration
+    // ========================================
+    // Direct Message Events
+    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
+    pub message_direct: Option<MessageFilterPolicy>,
+
+    // Guild Events
+    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
+    pub message_guild: Option<MessageFilterPolicy>,
+
+    // Context-Independent Events
+    #[serde(default)]
+    pub ready: Option<String>,
 }
 
 /// Mask sensitive strings by showing only first and last few characters
@@ -34,6 +61,9 @@ impl std::fmt::Debug for Params {
             .field("insecure_mode", &self.insecure_mode)
             .field("discord_token", &mask_token(&self.discord_token))
             .field("http_endpoint", &self.http_endpoint)
+            .field("message_direct", &self.message_direct)
+            .field("message_guild", &self.message_guild)
+            .field("ready", &self.ready)
             .finish()
     }
 }
@@ -41,6 +71,16 @@ impl std::fmt::Debug for Params {
 impl Params {
     pub fn new() -> anyhow::Result<Params> {
         envy::from_env::<Params>().context("Failed to load configuration")
+    }
+
+    /// Check if Direct Message events are enabled
+    pub fn has_direct_message_events(&self) -> bool {
+        self.message_direct.is_some()
+    }
+
+    /// Check if Guild Message events are enabled
+    pub fn has_guild_message_events(&self) -> bool {
+        self.message_guild.is_some()
     }
 }
 
@@ -75,6 +115,9 @@ mod tests {
             insecure_mode: false,
             discord_token: "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5".to_string(),
             http_endpoint: "https://example.com/webhook/secret123456".to_string(),
+            message_direct: None,
+            message_guild: None,
+            ready: None,
         };
 
         let debug_output = format!("{:?}", params);
