@@ -61,15 +61,15 @@ impl EventSender for HttpEventSender {
                 let action_count = event_response.actions.len();
                 if status.is_success() {
                     info!(
-                        %status,
                         %handler,
+                        %status,
                         actions = action_count,
                         "HTTP endpoint returned success status, response body parsed"
                     );
                 } else {
                     warn!(
-                        %status,
                         %handler,
+                        %status,
                         actions = action_count,
                         "HTTP endpoint returned non-success status, response body parsed"
                     );
@@ -80,15 +80,15 @@ impl EventSender for HttpEventSender {
                 if status.is_success() {
                     error!(
                         ?err,
-                        %status,
                         %handler,
+                        %status,
                         "HTTP endpoint returned success status, response body could not be parsed"
                     );
                 } else {
                     error!(
                         ?err,
-                        %status,
                         %handler,
+                        %status,
                         "HTTP endpoint returned non-success status, response body could not be parsed"
                     );
                 }
