@@ -116,7 +116,7 @@ impl EventHandler for Handler {
         }
 
         // Handle event (send to webhook + execute actions)
-        match self.bridge.handle_message(&ctx.http, &message).await {
+        match self.bridge.handle_message(&message).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Execute actions if webhook responded with any
                 if let Err(err) = self

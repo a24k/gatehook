@@ -22,70 +22,20 @@ fn create_test_message(content: &str, message_id: u64, channel_id: u64) -> Messa
 }
 
 #[tokio::test]
-async fn test_handle_message_ping_pong() {
+async fn test_handle_message_forwards_to_webhook() {
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
 
-    // Create a dummy HTTP client (token doesn't matter for mock)
-    let http = serenity::http::Http::new("dummy_token");
-
-    // Create a "Ping!" message
-    let message = create_test_message("Ping!", 123, 456);
-
-    // Execute
-    let result = bridge.handle_message(&http, &message).await;
-
-    // Verify
-    assert!(result.is_ok(), "handle_message should succeed");
-
-    // Check that Discord reply was sent
-    let replies = discord_service.get_replies();
-    assert_eq!(replies.len(), 1, "Should send one reply");
-    assert_eq!(replies[0].content, "Pong!", "Reply content should be 'Pong!'");
-    assert_eq!(
-        replies[0].message_id,
-        MessageId::new(123),
-        "Should reply to correct message"
-    );
-    assert_eq!(
-        replies[0].channel_id,
-        ChannelId::new(456),
-        "Should reply in correct channel"
-    );
-
-    // Check that event was forwarded to webhook
-    let sent_events = event_sender.get_sent_events();
-    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
-    assert_eq!(
-        sent_events[0].handler, "message",
-        "Event handler should be 'message'"
-    );
-}
-
-#[tokio::test]
-async fn test_handle_message_normal() {
-    // Setup
-    let discord_service = Arc::new(MockDiscordService::new());
-    let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
-
-    // Create a dummy HTTP client (token doesn't matter for mock)
-    let http = serenity::http::Http::new("dummy_token");
-
-    // Create a normal message (not "Ping!")
+    // Create a message
     let message = create_test_message("Hello, world!", 789, 456);
 
     // Execute
-    let result = bridge.handle_message(&http, &message).await;
+    let result = bridge.handle_message(&message).await;
 
     // Verify
     assert!(result.is_ok(), "handle_message should succeed");
-
-    // Check that NO Discord reply was sent
-    let replies = discord_service.get_replies();
-    assert_eq!(replies.len(), 0, "Should not send any reply");
 
     // Check that event was forwarded to webhook
     let sent_events = event_sender.get_sent_events();
@@ -228,11 +178,10 @@ async fn test_handle_message_with_webhook_response() {
     let event_sender = Arc::new(MockEventSender::with_response(event_response));
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Hello", 999, 1000);
 
     // Execute handle_message (which should return the EventResponse)
-    let result = bridge.handle_message(&http, &message).await;
+    let result = bridge.handle_message(&message).await;
 
     // Verify
     assert!(result.is_ok());
