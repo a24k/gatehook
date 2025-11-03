@@ -1,4 +1,4 @@
-use crate::adapters::{Action, DiscordService, EventResponse, EventSender};
+use crate::adapters::{DiscordService, EventResponse, EventSender, ResponseAction};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
@@ -110,21 +110,21 @@ where
         Ok(())
     }
 
-    /// 個別のアクションを実行
+    /// Execute a single action
     async fn execute_action(
         &self,
         http: &serenity::http::Http,
         message: &Message,
-        action: &Action,
+        action: &ResponseAction,
     ) -> anyhow::Result<()> {
         match action {
-            Action::Reply { content, mention } => {
+            ResponseAction::Reply { content, mention } => {
                 self.execute_reply(http, message, content, *mention).await
             }
         }
     }
 
-    /// Reply アクションを実行
+    /// Execute Reply action
     async fn execute_reply(
         &self,
         http: &serenity::http::Http,

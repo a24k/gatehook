@@ -101,10 +101,10 @@ impl EventHandler for Handler {
             return;
         }
 
-        // イベント処理（Webhook送信 + アクション実行）
+        // Handle event (send to webhook + execute actions)
         match self.bridge.handle_message(&ctx.http, &message).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
-                // Webhookから応答があり、アクションが含まれる場合は実行
+                // Execute actions if webhook responded with any
                 if let Err(err) = self
                     .bridge
                     .execute_actions(&ctx.http, &message, &event_response)
@@ -114,7 +114,7 @@ impl EventHandler for Handler {
                 }
             }
             Ok(_) => {
-                // 応答なし、または空のアクション → 正常終了
+                // No response or empty actions - success
             }
             Err(err) => {
                 error!(?err, "Failed to handle message event");

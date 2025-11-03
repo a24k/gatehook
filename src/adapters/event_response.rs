@@ -1,35 +1,35 @@
 use serde::Deserialize;
 
-/// Webhookエンドポイントからの応答
+/// Response from webhook endpoint
 ///
-/// Discordイベントを送信した結果として、Webhookエンドポイントから返される応答。
-/// Botが実行すべきアクションのリストを含む。
+/// The response returned from the webhook endpoint after sending a Discord event.
+/// Contains a list of actions for the bot to execute.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct EventResponse {
-    /// 実行するアクションのリスト
+    /// List of actions to execute
     ///
-    /// 空の場合、またはフィールドが存在しない場合は何もしない。
+    /// If empty or the field is missing, no actions will be performed.
     #[serde(default)]
-    pub actions: Vec<Action>,
+    pub actions: Vec<ResponseAction>,
 }
 
-/// Discord上で実行可能なアクション
+/// Action executable from webhook response
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Action {
-    /// メッセージに返信する
+pub enum ResponseAction {
+    /// Reply to a message
     ///
-    /// # コンテキスト要件
-    /// このアクションはメッセージコンテキストが必要です（`message`ハンドラのみ）。
+    /// # Context Requirements
+    /// This action requires message context (`message` handler only).
     Reply {
-        /// 返信内容
+        /// Reply content
         ///
-        /// 2000文字（Unicode code points）を超える場合は自動的に切り詰められます。
+        /// Content exceeding 2000 characters (Unicode code points) will be automatically truncated.
         content: String,
-        /// メンション通知するか
+        /// Whether to ping/mention the user
         ///
-        /// - `true`: 返信先ユーザーに通知が送られる（`reply_ping`）
-        /// - `false`: 通知なしで返信（`reply`、デフォルト）
+        /// - `true`: Notification will be sent to the replied user (`reply_ping`)
+        /// - `false`: Reply without notification (`reply`, default)
         #[serde(default)]
         mention: bool,
     },
@@ -74,7 +74,7 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            Action::Reply { content, mention } => {
+            ResponseAction::Reply { content, mention } => {
                 assert_eq!(content, expected_content);
                 assert_eq!(*mention, expected_mention);
             }
@@ -93,14 +93,14 @@ mod tests {
         assert_eq!(response.actions.len(), 2);
 
         match &response.actions[0] {
-            Action::Reply { content, mention } => {
+            ResponseAction::Reply { content, mention } => {
                 assert_eq!(content, "First reply");
                 assert!(!mention);
             }
         }
 
         match &response.actions[1] {
-            Action::Reply { content, mention } => {
+            ResponseAction::Reply { content, mention } => {
                 assert_eq!(content, "Second reply");
                 assert!(mention);
             }

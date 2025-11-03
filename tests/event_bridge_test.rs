@@ -101,7 +101,7 @@ async fn test_handle_message_normal() {
 
 #[tokio::test]
 async fn test_execute_actions_reply() {
-    use gatehook::adapters::{Action, EventResponse};
+    use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
@@ -113,7 +113,7 @@ async fn test_execute_actions_reply() {
 
     // Create EventResponse with reply action
     let event_response = EventResponse {
-        actions: vec![Action::Reply {
+        actions: vec![ResponseAction::Reply {
             content: "Reply from webhook".to_string(),
             mention: false,
         }],
@@ -135,7 +135,7 @@ async fn test_execute_actions_reply() {
 
 #[tokio::test]
 async fn test_execute_actions_reply_with_mention() {
-    use gatehook::adapters::{Action, EventResponse};
+    use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
@@ -147,7 +147,7 @@ async fn test_execute_actions_reply_with_mention() {
 
     // Create EventResponse with mention=true
     let event_response = EventResponse {
-        actions: vec![Action::Reply {
+        actions: vec![ResponseAction::Reply {
             content: "Reply with mention".to_string(),
             mention: true,
         }],
@@ -166,7 +166,7 @@ async fn test_execute_actions_reply_with_mention() {
 
 #[tokio::test]
 async fn test_execute_actions_multiple_replies() {
-    use gatehook::adapters::{Action, EventResponse};
+    use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
@@ -179,11 +179,11 @@ async fn test_execute_actions_multiple_replies() {
     // Multiple actions
     let event_response = EventResponse {
         actions: vec![
-            Action::Reply {
+            ResponseAction::Reply {
                 content: "First reply".to_string(),
                 mention: false,
             },
-            Action::Reply {
+            ResponseAction::Reply {
                 content: "Second reply".to_string(),
                 mention: true,
             },
@@ -205,7 +205,7 @@ async fn test_execute_actions_multiple_replies() {
 
 #[tokio::test]
 async fn test_execute_actions_long_content_truncated() {
-    use gatehook::adapters::{Action, EventResponse};
+    use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
@@ -219,7 +219,7 @@ async fn test_execute_actions_long_content_truncated() {
     let long_content = "a".repeat(2100);
 
     let event_response = EventResponse {
-        actions: vec![Action::Reply {
+        actions: vec![ResponseAction::Reply {
             content: long_content,
             mention: false,
         }],
@@ -239,12 +239,12 @@ async fn test_execute_actions_long_content_truncated() {
 
 #[tokio::test]
 async fn test_handle_message_with_webhook_response() {
-    use gatehook::adapters::{Action, EventResponse};
+    use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup: MockEventSender with pre-configured response
     let discord_service = Arc::new(MockDiscordService::new());
     let event_response = EventResponse {
-        actions: vec![Action::Reply {
+        actions: vec![ResponseAction::Reply {
             content: "Webhook responded!".to_string(),
             mention: false,
         }],
