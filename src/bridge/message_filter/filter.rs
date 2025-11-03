@@ -9,7 +9,7 @@ use super::policy::MessageFilterPolicy;
 /// Can only be created via `MessageFilterPolicy::for_user()`.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
-    current_user_id: UserId,
+    user_id: UserId,
     policy: MessageFilterPolicy,
 }
 
@@ -17,9 +17,9 @@ impl MessageFilter {
     /// Create a new MessageFilter (private constructor)
     ///
     /// This is intentionally not public. Use `MessageFilterPolicy::for_user()` instead.
-    pub(super) fn new(current_user_id: UserId, policy: MessageFilterPolicy) -> Self {
+    pub(super) fn new(user_id: UserId, policy: MessageFilterPolicy) -> Self {
         Self {
-            current_user_id,
+            user_id,
             policy,
         }
     }
@@ -40,7 +40,7 @@ impl MessageFilter {
         // Sender type classification
 
         // 1. self
-        if message.author_id() == self.current_user_id {
+        if message.author_id() == self.user_id {
             return self.policy.allow_self;
         }
 
