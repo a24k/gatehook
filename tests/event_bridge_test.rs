@@ -5,6 +5,7 @@ mod adapters;
 
 use adapters::{MockDiscordService, MockEventSender};
 use gatehook::bridge::event_bridge::EventBridge;
+use rstest::rstest;
 use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, MessageId};
 use serenity::model::user::User;
@@ -99,8 +100,14 @@ async fn test_handle_message_normal() {
 // and creating a valid Ready instance requires extensive setup.
 // The ready event forwarding is tested through integration testing instead.
 
+#[rstest]
+#[case::without_mention("Reply from webhook", false)]
+#[case::with_mention("Reply with mention", true)]
 #[tokio::test]
-async fn test_execute_actions_reply() {
+async fn test_execute_actions_reply(
+    #[case] expected_content: &str,
+    #[case] mention: bool,
+) {
     use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
@@ -114,8 +121,8 @@ async fn test_execute_actions_reply() {
     // Create EventResponse with reply action
     let event_response = EventResponse {
         actions: vec![ResponseAction::Reply {
-            content: "Reply from webhook".to_string(),
-            mention: false,
+            content: expected_content.to_string(),
+            mention,
         }],
     };
 
@@ -127,41 +134,10 @@ async fn test_execute_actions_reply() {
 
     let replies = discord_service.get_replies();
     assert_eq!(replies.len(), 1, "Should send one reply");
-    assert_eq!(replies[0].content, "Reply from webhook");
+    assert_eq!(replies[0].content, expected_content);
     assert_eq!(replies[0].message_id, MessageId::new(111));
     assert_eq!(replies[0].channel_id, ChannelId::new(222));
-    assert!(!replies[0].mention, "Should not mention");
-}
-
-#[tokio::test]
-async fn test_execute_actions_reply_with_mention() {
-    use gatehook::adapters::{EventResponse, ResponseAction};
-
-    // Setup
-    let discord_service = Arc::new(MockDiscordService::new());
-    let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
-
-    let http = serenity::http::Http::new("dummy_token");
-    let message = create_test_message("Test message", 333, 444);
-
-    // Create EventResponse with mention=true
-    let event_response = EventResponse {
-        actions: vec![ResponseAction::Reply {
-            content: "Reply with mention".to_string(),
-            mention: true,
-        }],
-    };
-
-    // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
-
-    // Verify
-    assert!(result.is_ok());
-    let replies = discord_service.get_replies();
-    assert_eq!(replies.len(), 1);
-    assert_eq!(replies[0].content, "Reply with mention");
-    assert!(replies[0].mention, "Should mention");
+    assert_eq!(replies[0].mention, mention);
 }
 
 #[tokio::test]
