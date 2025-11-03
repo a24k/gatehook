@@ -80,19 +80,21 @@ where
     /// # Arguments
     ///
     /// * `ready` - The ready event from Discord
-    pub async fn handle_ready(&self, ready: &Ready) -> anyhow::Result<()> {
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (may contain actions)
+    pub async fn handle_ready(&self, ready: &Ready) -> anyhow::Result<Option<EventResponse>> {
         debug!(
             user = %ready.user.display_name(),
             "Processing ready event"
         );
 
-        // Forward event to webhook endpoint
+        // Forward event to webhook endpoint and return response
         self.event_sender
             .send("ready", ready)
             .await
-            .context("Failed to send ready event to HTTP endpoint")?;
-
-        Ok(())
+            .context("Failed to send ready event to HTTP endpoint")
     }
 
     /// Execute actions from webhook response
