@@ -30,7 +30,7 @@ impl MockEventSender {
         }
     }
 
-    /// テスト用: 応答を設定したMockEventSenderを作成
+    /// Create MockEventSender with pre-configured response (for testing)
     pub fn with_response(response: EventResponse) -> Self {
         Self {
             sent_events: Arc::new(Mutex::new(Vec::new())),
