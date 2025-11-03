@@ -23,10 +23,10 @@ impl DiscordService for SerenityDiscordService {
 
         // Configure mention settings
         if mention {
-            // Enable mention notification
+            // Enable mention notification (ping the user)
             builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(true));
         } else {
-            // Disable mention notification (default)
+            // Disable mention notification (no ping)
             builder = builder.allowed_mentions(CreateAllowedMentions::new().replied_user(false));
         }
 
