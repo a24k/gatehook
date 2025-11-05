@@ -98,12 +98,25 @@ fn default_auto_archive() -> AutoArchiveDuration {
 }
 
 /// Custom deserializer for AutoArchiveDuration from u16 minutes
+///
+/// Only accepts valid Discord API values: 60, 1440, 4320, 10080
 fn deserialize_auto_archive<'de, D>(deserializer: D) -> Result<AutoArchiveDuration, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let minutes = u16::deserialize(deserializer)?;
-    Ok(AutoArchiveDuration::from(minutes))
+
+    // Validate and convert to known variants only
+    match minutes {
+        60 => Ok(AutoArchiveDuration::OneHour),
+        1440 => Ok(AutoArchiveDuration::OneDay),
+        4320 => Ok(AutoArchiveDuration::ThreeDays),
+        10080 => Ok(AutoArchiveDuration::OneWeek),
+        _ => Err(serde::de::Error::custom(format!(
+            "invalid auto_archive_duration: {} (valid values: 60, 1440, 4320, 10080)",
+            minutes
+        ))),
+    }
 }
 
 
@@ -285,6 +298,42 @@ mod tests {
 
         match &response.actions[2] {
             ResponseAction::Thread { .. } => {}
+            _ => panic!("Expected Thread action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_thread_invalid_auto_archive_duration() {
+        // Invalid duration (not 60, 1440, 4320, or 10080)
+        let json = r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":100}]}"#;
+        let result = serde_json::from_str::<EventResponse>(json);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("invalid auto_archive_duration"));
+        assert!(err.to_string().contains("100"));
+    }
+
+    #[rstest]
+    #[case::one_hour(60, AutoArchiveDuration::OneHour)]
+    #[case::one_day(1440, AutoArchiveDuration::OneDay)]
+    #[case::three_days(4320, AutoArchiveDuration::ThreeDays)]
+    #[case::one_week(10080, AutoArchiveDuration::OneWeek)]
+    fn test_parse_thread_valid_auto_archive_durations(
+        #[case] duration_minutes: u16,
+        #[case] expected: AutoArchiveDuration,
+    ) {
+        let json = format!(
+            r#"{{"actions":[{{"type":"thread","content":"Test","auto_archive_duration":{}}}]}}"#,
+            duration_minutes
+        );
+        let response: EventResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(response.actions.len(), 1);
+
+        match &response.actions[0] {
+            ResponseAction::Thread { auto_archive_duration, .. } => {
+                assert_eq!(*auto_archive_duration, expected);
+            }
             _ => panic!("Expected Thread action"),
         }
     }
