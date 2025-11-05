@@ -199,10 +199,9 @@ where
         message: &Message,
         params: &ThreadParams,
     ) -> anyhow::Result<()> {
-        // Check if DM (guild_id is None)
-        if message.guild_id.is_none() {
-            anyhow::bail!("Thread action is not supported in DM");
-        }
+        // Ensure we're in a guild (threads not supported in DM)
+        message.guild_id
+            .context("Thread action is not supported in DM")?;
 
         // Check if already in thread
         let is_in_thread = self
