@@ -117,6 +117,27 @@ where
             ResponseAction::Reply { content, mention } => {
                 self.execute_reply(http, message, content, *mention).await
             }
+            ResponseAction::React { emoji } => {
+                self.execute_react(http, message, emoji).await
+            }
+            ResponseAction::Thread {
+                name,
+                content,
+                reply,
+                mention,
+                auto_archive_duration,
+            } => {
+                self.execute_thread(
+                    http,
+                    message,
+                    name.as_deref(),
+                    content,
+                    *reply,
+                    *mention,
+                    *auto_archive_duration,
+                )
+                .await
+            }
         }
     }
 
@@ -128,21 +149,7 @@ where
         content: &str,
         mention: bool,
     ) -> anyhow::Result<()> {
-        // 2000文字制限チェック + 切り詰め
-        let content = if content.chars().count() > 2000 {
-            let truncated: String = content.chars().take(1997).collect();
-            let truncated = format!("{}...", truncated);
-
-            warn!(
-                original_len = content.chars().count(),
-                truncated_len = truncated.chars().count(),
-                "Reply content exceeds 2000 chars, truncated"
-            );
-
-            truncated
-        } else {
-            content.to_string()
-        };
+        let content = truncate_content(content);
 
         self.discord_service
             .reply_to_message(http, message.channel_id, message.id, &content, mention)
@@ -157,5 +164,159 @@ where
         );
 
         Ok(())
+    }
+
+    /// Execute React action
+    async fn execute_react(
+        &self,
+        http: &serenity::http::Http,
+        message: &Message,
+        emoji: &str,
+    ) -> anyhow::Result<()> {
+        self.discord_service
+            .react_to_message(http, message.channel_id, message.id, emoji)
+            .await
+            .context("Failed to add reaction to Discord")?;
+
+        info!(
+            message_id = %message.id,
+            emoji = emoji,
+            "Successfully executed react action"
+        );
+
+        Ok(())
+    }
+
+    /// Execute Thread action
+    #[allow(clippy::too_many_arguments)]
+    async fn execute_thread(
+        &self,
+        http: &serenity::http::Http,
+        message: &Message,
+        name: Option<&str>,
+        content: &str,
+        reply: bool,
+        mention: bool,
+        auto_archive_duration: u16,
+    ) -> anyhow::Result<()> {
+        // Check if DM (guild_id is None)
+        if message.guild_id.is_none() {
+            anyhow::bail!("Thread action is not supported in DM");
+        }
+
+        // Check if already in thread
+        let is_in_thread = self
+            .discord_service
+            .is_thread_channel(http, message.channel_id)
+            .await
+            .context("Failed to check if channel is thread")?;
+
+        // Determine target channel ID
+        let target_channel_id = if is_in_thread {
+            // Already in thread → use as-is
+            if name.is_some() {
+                debug!("Already in thread, ignoring 'name' parameter");
+            }
+            info!("Message is already in thread, skipping thread creation");
+            message.channel_id
+        } else {
+            // Normal channel → create new thread
+            let thread_name = name
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| generate_thread_name(message));
+
+            let thread = self
+                .discord_service
+                .create_thread_from_message(http, message, &thread_name, auto_archive_duration)
+                .await
+                .context("Failed to create thread")?;
+
+            info!(
+                thread_id = %thread.id,
+                thread_name = %thread_name,
+                "Created new thread"
+            );
+            thread.id
+        };
+
+        // Truncate content
+        let content = truncate_content(content);
+
+        // Post message
+        if reply {
+            self.discord_service
+                .reply_in_channel(http, target_channel_id, message.id, &content, mention)
+                .await
+                .context("Failed to send reply in thread")?;
+
+            info!(
+                channel_id = %target_channel_id,
+                message_id = %message.id,
+                reply = true,
+                mention = mention,
+                "Successfully executed thread action with reply"
+            );
+        } else {
+            self.discord_service
+                .send_message_to_channel(http, target_channel_id, &content)
+                .await
+                .context("Failed to send message to thread")?;
+
+            info!(
+                channel_id = %target_channel_id,
+                reply = false,
+                "Successfully executed thread action"
+            );
+        }
+
+        Ok(())
+    }
+}
+
+/// Truncate content to Discord's 2000 character limit
+fn truncate_content(content: &str) -> String {
+    const MAX_LEN: usize = 2000;
+
+    let char_count = content.chars().count();
+
+    if char_count > MAX_LEN {
+        let truncated: String = content.chars().take(MAX_LEN - 3).collect();
+        let result = format!("{}...", truncated);
+
+        warn!(
+            original_len = char_count,
+            truncated_len = result.chars().count(),
+            "Content exceeds 2000 chars, truncated"
+        );
+
+        result
+    } else {
+        content.to_string()
+    }
+}
+
+/// Generate thread name from message content
+fn generate_thread_name(message: &Message) -> String {
+    const MAX_LEN: usize = 100; // Discord API maximum
+
+    // Use first line only, trim whitespace
+    let content = message
+        .content
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim();
+
+    if content.is_empty() {
+        return "Thread".to_string();
+    }
+
+    let char_count = content.chars().count();
+
+    if char_count <= MAX_LEN {
+        content.to_string()
+    } else {
+        // Truncate to API limit
+        content.chars().take(MAX_LEN).collect()
     }
 }
