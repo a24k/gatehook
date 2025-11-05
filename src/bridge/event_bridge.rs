@@ -1,6 +1,9 @@
-use crate::adapters::{DiscordService, EventResponse, EventSender, ResponseAction};
+use crate::adapters::{
+    DiscordService, EventResponse, EventSender, ReactParams, ReplyParams, ResponseAction,
+    ThreadParams,
+};
 use anyhow::Context as _;
-use serenity::model::channel::{AutoArchiveDuration, Message};
+use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -114,30 +117,9 @@ where
         action: &ResponseAction,
     ) -> anyhow::Result<()> {
         match action {
-            ResponseAction::Reply { content, mention } => {
-                self.execute_reply(http, message, content, *mention).await
-            }
-            ResponseAction::React { emoji } => {
-                self.execute_react(http, message, emoji).await
-            }
-            ResponseAction::Thread {
-                name,
-                content,
-                reply,
-                mention,
-                auto_archive_duration,
-            } => {
-                self.execute_thread(
-                    http,
-                    message,
-                    name.as_deref(),
-                    content,
-                    *reply,
-                    *mention,
-                    *auto_archive_duration,
-                )
-                .await
-            }
+            ResponseAction::Reply(params) => self.execute_reply(http, message, params).await,
+            ResponseAction::React(params) => self.execute_react(http, message, params).await,
+            ResponseAction::Thread(params) => self.execute_thread(http, message, params).await,
         }
     }
 
@@ -146,19 +128,18 @@ where
         &self,
         http: &serenity::http::Http,
         message: &Message,
-        content: &str,
-        mention: bool,
+        params: &ReplyParams,
     ) -> anyhow::Result<()> {
-        let content = truncate_content(content);
+        let content = truncate_content(&params.content);
 
         self.discord_service
-            .reply_to_message(http, message.channel_id, message.id, &content, mention)
+            .reply_to_message(http, message.channel_id, message.id, &content, params.mention)
             .await
             .context("Failed to send reply to Discord")?;
 
         info!(
             message_id = %message.id,
-            mention = mention,
+            mention = params.mention,
             content_len = content.chars().count(),
             "Successfully executed reply action"
         );
@@ -171,16 +152,16 @@ where
         &self,
         http: &serenity::http::Http,
         message: &Message,
-        emoji: &str,
+        params: &ReactParams,
     ) -> anyhow::Result<()> {
         self.discord_service
-            .react_to_message(http, message.channel_id, message.id, emoji)
+            .react_to_message(http, message.channel_id, message.id, &params.emoji)
             .await
             .context("Failed to add reaction to Discord")?;
 
         info!(
             message_id = %message.id,
-            emoji = emoji,
+            emoji = %params.emoji,
             "Successfully executed react action"
         );
 
@@ -188,16 +169,11 @@ where
     }
 
     /// Execute Thread action
-    #[allow(clippy::too_many_arguments)]
     async fn execute_thread(
         &self,
         http: &serenity::http::Http,
         message: &Message,
-        name: Option<&str>,
-        content: &str,
-        reply: bool,
-        mention: bool,
-        auto_archive_duration: AutoArchiveDuration,
+        params: &ThreadParams,
     ) -> anyhow::Result<()> {
         // Check if DM (guild_id is None)
         if message.guild_id.is_none() {
@@ -214,20 +190,27 @@ where
         // Determine target channel ID
         let target_channel_id = if is_in_thread {
             // Already in thread → use as-is
-            if name.is_some() {
+            if params.name.is_some() {
                 debug!("Already in thread, ignoring 'name' parameter");
             }
             info!("Message is already in thread, skipping thread creation");
             message.channel_id
         } else {
             // Normal channel → create new thread
-            let thread_name = name
+            let thread_name = params
+                .name
+                .as_ref()
                 .map(|n| n.to_string())
                 .unwrap_or_else(|| generate_thread_name(message));
 
             let thread = self
                 .discord_service
-                .create_thread_from_message(http, message, &thread_name, auto_archive_duration)
+                .create_thread_from_message(
+                    http,
+                    message,
+                    &thread_name,
+                    params.auto_archive_duration,
+                )
                 .await
                 .context("Failed to create thread")?;
 
@@ -240,12 +223,12 @@ where
         };
 
         // Truncate content
-        let content = truncate_content(content);
+        let content = truncate_content(&params.content);
 
         // Post message
-        if reply {
+        if params.reply {
             self.discord_service
-                .reply_in_channel(http, target_channel_id, message.id, &content, mention)
+                .reply_in_channel(http, target_channel_id, message.id, &content, params.mention)
                 .await
                 .context("Failed to send reply in thread")?;
 
@@ -253,7 +236,7 @@ where
                 channel_id = %target_channel_id,
                 message_id = %message.id,
                 reply = true,
-                mention = mention,
+                mention = params.mention,
                 "Successfully executed thread action with reply"
             );
         } else {

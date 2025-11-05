@@ -14,6 +14,68 @@ pub struct EventResponse {
     pub actions: Vec<ResponseAction>,
 }
 
+/// Parameters for Reply action
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct ReplyParams {
+    /// Reply content
+    ///
+    /// Content exceeding 2000 characters (Unicode code points) will be automatically truncated.
+    pub content: String,
+    /// Whether to ping/mention the user
+    ///
+    /// - `true`: Notification will be sent to the replied user (`reply_ping`)
+    /// - `false`: Reply without notification (`reply`, default)
+    #[serde(default)]
+    pub mention: bool,
+}
+
+/// Parameters for React action
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct ReactParams {
+    /// Emoji to react with
+    ///
+    /// Can be:
+    /// - Unicode emoji (e.g., "👍", "🎉")
+    /// - Custom emoji in format "name:id" (e.g., "customemoji:123456789")
+    pub emoji: String,
+}
+
+/// Parameters for Thread action
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct ThreadParams {
+    /// Thread name (auto-generated if omitted)
+    ///
+    /// - 1-100 characters (Discord API limit)
+    /// - If omitted: Generated from first line of message (max 100 chars)
+    /// - Empty message fallback: "Thread"
+    /// - Ignored if already in thread
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Message content (2000 char limit, auto-truncated)
+    pub content: String,
+    /// Whether to post as a reply
+    ///
+    /// - `true`: Post as reply to the original message
+    /// - `false`: Post as normal message (default)
+    #[serde(default)]
+    pub reply: bool,
+    /// Whether to mention the user (only effective when reply=true)
+    ///
+    /// - `true`: Mention the replied user
+    /// - `false`: No mention (default)
+    #[serde(default)]
+    pub mention: bool,
+    /// Auto-archive duration
+    ///
+    /// Valid values (in minutes):
+    /// - 60 (OneHour)
+    /// - 1440 (OneDay, default)
+    /// - 4320 (ThreeDays)
+    /// - 10080 (OneWeek)
+    #[serde(default = "default_auto_archive", deserialize_with = "deserialize_auto_archive")]
+    pub auto_archive_duration: AutoArchiveDuration,
+}
+
 /// Action executable from webhook response
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -22,30 +84,12 @@ pub enum ResponseAction {
     ///
     /// # Context Requirements
     /// This action requires message context (`message` handler only).
-    Reply {
-        /// Reply content
-        ///
-        /// Content exceeding 2000 characters (Unicode code points) will be automatically truncated.
-        content: String,
-        /// Whether to ping/mention the user
-        ///
-        /// - `true`: Notification will be sent to the replied user (`reply_ping`)
-        /// - `false`: Reply without notification (`reply`, default)
-        #[serde(default)]
-        mention: bool,
-    },
+    Reply(ReplyParams),
     /// Add a reaction to a message
     ///
     /// # Context Requirements
     /// This action requires message context (`message` handler only).
-    React {
-        /// Emoji to react with
-        ///
-        /// Can be:
-        /// - Unicode emoji (e.g., "👍", "🎉")
-        /// - Custom emoji in format "name:id" (e.g., "customemoji:123456789")
-        emoji: String,
-    },
+    React(ReactParams),
     /// Create a thread or post to existing thread
     ///
     /// # Context Requirements
@@ -57,39 +101,7 @@ pub enum ResponseAction {
     ///   - `name: None`: Auto-generate from message content (max 100 chars)
     /// - **Already in thread**: Post to current thread (name is ignored)
     /// - **DM**: Error (not supported)
-    Thread {
-        /// Thread name (auto-generated if omitted)
-        ///
-        /// - 1-100 characters (Discord API limit)
-        /// - If omitted: Generated from first line of message (max 100 chars)
-        /// - Empty message fallback: "Thread"
-        /// - Ignored if already in thread
-        #[serde(default)]
-        name: Option<String>,
-        /// Message content (2000 char limit, auto-truncated)
-        content: String,
-        /// Whether to post as a reply
-        ///
-        /// - `true`: Post as reply to the original message
-        /// - `false`: Post as normal message (default)
-        #[serde(default)]
-        reply: bool,
-        /// Whether to mention the user (only effective when reply=true)
-        ///
-        /// - `true`: Mention the replied user
-        /// - `false`: No mention (default)
-        #[serde(default)]
-        mention: bool,
-        /// Auto-archive duration
-        ///
-        /// Valid values (in minutes):
-        /// - 60 (OneHour)
-        /// - 1440 (OneDay, default)
-        /// - 4320 (ThreeDays)
-        /// - 10080 (OneWeek)
-        #[serde(default = "default_auto_archive", deserialize_with = "deserialize_auto_archive")]
-        auto_archive_duration: AutoArchiveDuration,
-    },
+    Thread(ThreadParams),
 }
 
 /// Default auto-archive duration (24 hours)
@@ -156,9 +168,9 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            ResponseAction::Reply { content, mention } => {
-                assert_eq!(content, expected_content);
-                assert_eq!(*mention, expected_mention);
+            ResponseAction::Reply(params) => {
+                assert_eq!(params.content, expected_content);
+                assert_eq!(params.mention, expected_mention);
             }
             _ => panic!("Expected Reply action"),
         }
@@ -176,17 +188,17 @@ mod tests {
         assert_eq!(response.actions.len(), 2);
 
         match &response.actions[0] {
-            ResponseAction::Reply { content, mention } => {
-                assert_eq!(content, "First reply");
-                assert!(!mention);
+            ResponseAction::Reply(params) => {
+                assert_eq!(params.content, "First reply");
+                assert!(!params.mention);
             }
             _ => panic!("Expected Reply action"),
         }
 
         match &response.actions[1] {
-            ResponseAction::Reply { content, mention } => {
-                assert_eq!(content, "Second reply");
-                assert!(mention);
+            ResponseAction::Reply(params) => {
+                assert_eq!(params.content, "Second reply");
+                assert!(params.mention);
             }
             _ => panic!("Expected Reply action"),
         }
@@ -203,8 +215,8 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            ResponseAction::React { emoji } => {
-                assert_eq!(emoji, expected_emoji);
+            ResponseAction::React(params) => {
+                assert_eq!(params.emoji, expected_emoji);
             }
             _ => panic!("Expected React action"),
         }
@@ -255,18 +267,12 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            ResponseAction::Thread {
-                name,
-                content,
-                reply,
-                mention,
-                auto_archive_duration,
-            } => {
-                assert_eq!(name.as_deref(), expected_name);
-                assert_eq!(content, expected_content);
-                assert_eq!(*reply, expected_reply);
-                assert_eq!(*mention, expected_mention);
-                assert_eq!(*auto_archive_duration, expected_auto_archive);
+            ResponseAction::Thread(params) => {
+                assert_eq!(params.name.as_deref(), expected_name);
+                assert_eq!(params.content, expected_content);
+                assert_eq!(params.reply, expected_reply);
+                assert_eq!(params.mention, expected_mention);
+                assert_eq!(params.auto_archive_duration, expected_auto_archive);
             }
             _ => panic!("Expected Thread action"),
         }
@@ -308,8 +314,8 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            ResponseAction::Thread { auto_archive_duration, .. } => {
-                assert_eq!(*auto_archive_duration, AutoArchiveDuration::OneDay);
+            ResponseAction::Thread(params) => {
+                assert_eq!(params.auto_archive_duration, AutoArchiveDuration::OneDay);
             }
             _ => panic!("Expected Thread action"),
         }
@@ -332,8 +338,8 @@ mod tests {
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
-            ResponseAction::Thread { auto_archive_duration, .. } => {
-                assert_eq!(*auto_archive_duration, expected);
+            ResponseAction::Thread(params) => {
+                assert_eq!(params.auto_archive_duration, expected);
             }
             _ => panic!("Expected Thread action"),
         }

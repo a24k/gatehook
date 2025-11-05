@@ -4,6 +4,7 @@
 mod adapters;
 
 use adapters::{MockDiscordService, MockEventSender};
+use gatehook::adapters::{ReactParams, ReplyParams, ThreadParams};
 use gatehook::bridge::event_bridge::EventBridge;
 use rstest::rstest;
 use serenity::model::channel::{AutoArchiveDuration, Message};
@@ -77,10 +78,10 @@ async fn test_execute_actions_reply(
 
     // Create EventResponse with reply action
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Reply {
+        actions: vec![ResponseAction::Reply(ReplyParams {
             content: expected_content.to_string(),
             mention,
-        }],
+        })],
     };
 
     // Execute
@@ -112,14 +113,14 @@ async fn test_execute_actions_multiple_replies() {
     // Multiple actions
     let event_response = EventResponse {
         actions: vec![
-            ResponseAction::Reply {
+            ResponseAction::Reply(ReplyParams {
                 content: "First reply".to_string(),
                 mention: false,
-            },
-            ResponseAction::Reply {
+            }),
+            ResponseAction::Reply(ReplyParams {
                 content: "Second reply".to_string(),
                 mention: true,
-            },
+            }),
         ],
     };
 
@@ -152,10 +153,10 @@ async fn test_execute_actions_long_content_truncated() {
     let long_content = "a".repeat(2100);
 
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Reply {
+        actions: vec![ResponseAction::Reply(ReplyParams {
             content: long_content,
             mention: false,
-        }],
+        })],
     };
 
     // Execute
@@ -177,10 +178,10 @@ async fn test_handle_message_with_webhook_response() {
     // Setup: MockEventSender with pre-configured response
     let discord_service = Arc::new(MockDiscordService::new());
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Reply {
+        actions: vec![ResponseAction::Reply(ReplyParams {
             content: "Webhook responded!".to_string(),
             mention: false,
-        }],
+        })],
     };
     let event_sender = Arc::new(MockEventSender::with_response(event_response));
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
@@ -219,9 +220,9 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
 
     // Create EventResponse with react action
     let event_response = EventResponse {
-        actions: vec![ResponseAction::React {
+        actions: vec![ResponseAction::React(ReactParams {
             emoji: emoji.to_string(),
-        }],
+        })],
     };
 
     // Execute
@@ -252,13 +253,13 @@ async fn test_execute_actions_thread_create_new() {
 
     // Create EventResponse with thread action
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread {
+        actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Discussion".to_string()),
             content: "Let's discuss".to_string(),
             reply: false,
             mention: false,
             auto_archive_duration: AutoArchiveDuration::OneDay,
-        }],
+        })],
     };
 
     // Execute
@@ -295,13 +296,13 @@ async fn test_execute_actions_thread_auto_name() {
 
     // Thread action without name (should auto-generate)
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread {
+        actions: vec![ResponseAction::Thread(ThreadParams {
             name: None,
             content: "Response".to_string(),
             reply: false,
             mention: false,
             auto_archive_duration: AutoArchiveDuration::OneDay,
-        }],
+        })],
     };
 
     // Execute
@@ -330,13 +331,13 @@ async fn test_execute_actions_thread_already_in_thread() {
 
     // Thread action (should skip thread creation)
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread {
+        actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Ignored".to_string()),
             content: "Reply in thread".to_string(),
             reply: false,
             mention: false,
             auto_archive_duration: AutoArchiveDuration::OneDay,
-        }],
+        })],
     };
 
     // Execute
@@ -369,13 +370,13 @@ async fn test_execute_actions_thread_with_reply() {
 
     // Thread action with reply
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread {
+        actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Support".to_string()),
             content: "Help needed".to_string(),
             reply: true,
             mention: true,
             auto_archive_duration: AutoArchiveDuration::OneHour,
-        }],
+        })],
     };
 
     // Execute
@@ -409,13 +410,13 @@ async fn test_execute_actions_thread_in_dm_fails() {
 
     // Thread action
     let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread {
+        actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Thread".to_string()),
             content: "Content".to_string(),
             reply: false,
             mention: false,
             auto_archive_duration: AutoArchiveDuration::OneDay,
-        }],
+        })],
     };
 
     // Execute (should complete but log error)
@@ -445,20 +446,20 @@ async fn test_execute_actions_mixed_types() {
     // Multiple different action types
     let event_response = EventResponse {
         actions: vec![
-            ResponseAction::Reply {
+            ResponseAction::Reply(ReplyParams {
                 content: "Reply message".to_string(),
                 mention: false,
-            },
-            ResponseAction::React {
+            }),
+            ResponseAction::React(ReactParams {
                 emoji: "👍".to_string(),
-            },
-            ResponseAction::Thread {
+            }),
+            ResponseAction::Thread(ThreadParams {
                 name: Some("Discussion".to_string()),
                 content: "Thread content".to_string(),
                 reply: false,
                 mention: false,
                 auto_archive_duration: AutoArchiveDuration::OneDay,
-            },
+            }),
         ],
     };
 
