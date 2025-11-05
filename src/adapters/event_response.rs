@@ -99,23 +99,21 @@ fn default_auto_archive() -> AutoArchiveDuration {
 
 /// Custom deserializer for AutoArchiveDuration from u16 minutes
 ///
-/// Only accepts valid Discord API values: 60, 1440, 4320, 10080
+/// Validates and converts to known variants. Invalid values automatically
+/// fall back to the default (OneDay).
 fn deserialize_auto_archive<'de, D>(deserializer: D) -> Result<AutoArchiveDuration, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let minutes = u16::deserialize(deserializer)?;
 
-    // Validate and convert to known variants only
+    // Convert to known variants, fallback to default for invalid values
     match minutes {
         60 => Ok(AutoArchiveDuration::OneHour),
         1440 => Ok(AutoArchiveDuration::OneDay),
         4320 => Ok(AutoArchiveDuration::ThreeDays),
         10080 => Ok(AutoArchiveDuration::OneWeek),
-        _ => Err(serde::de::Error::custom(format!(
-            "invalid auto_archive_duration: {} (valid values: 60, 1440, 4320, 10080)",
-            minutes
-        ))),
+        _ => Ok(AutoArchiveDuration::OneDay), // Fallback to default
     }
 }
 
@@ -304,14 +302,17 @@ mod tests {
 
     #[test]
     fn test_parse_thread_invalid_auto_archive_duration() {
-        // Invalid duration (not 60, 1440, 4320, or 10080)
+        // Invalid duration (not 60, 1440, 4320, or 10080) falls back to default (OneDay)
         let json = r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":100}]}"#;
-        let result = serde_json::from_str::<EventResponse>(json);
+        let response: EventResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.actions.len(), 1);
 
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("invalid auto_archive_duration"));
-        assert!(err.to_string().contains("100"));
+        match &response.actions[0] {
+            ResponseAction::Thread { auto_archive_duration, .. } => {
+                assert_eq!(*auto_archive_duration, AutoArchiveDuration::OneDay);
+            }
+            _ => panic!("Expected Thread action"),
+        }
     }
 
     #[rstest]
