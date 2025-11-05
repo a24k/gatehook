@@ -1,6 +1,6 @@
 use super::discord_service::DiscordService;
 use serenity::async_trait;
-use serenity::model::channel::{Channel, ChannelType, GuildChannel, Message};
+use serenity::model::channel::{AutoArchiveDuration, Channel, ChannelType, GuildChannel, Message};
 use serenity::model::id::{ChannelId, MessageId};
 
 /// Implementation for Discord operations via Serenity
@@ -61,12 +61,12 @@ impl DiscordService for SerenityDiscordService {
         http: &serenity::http::Http,
         message: &Message,
         name: &str,
-        auto_archive_duration: u16,
+        auto_archive_duration: AutoArchiveDuration,
     ) -> Result<GuildChannel, serenity::Error> {
         use serenity::builder::CreateThread;
 
         let builder = CreateThread::new(name.to_string())
-            .auto_archive_duration(auto_archive_duration.into());
+            .auto_archive_duration(auto_archive_duration);
 
         message
             .channel_id

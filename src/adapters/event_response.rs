@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serenity::model::channel::AutoArchiveDuration;
 
 /// Response from webhook endpoint
 ///
@@ -79,18 +80,30 @@ pub enum ResponseAction {
         /// - `false`: No mention (default)
         #[serde(default)]
         mention: bool,
-        /// Auto-archive duration in minutes
+        /// Auto-archive duration
         ///
-        /// Valid values: 60, 1440, 4320, 10080
-        /// Default: 1440 (24 hours)
-        #[serde(default = "default_auto_archive")]
-        auto_archive_duration: u16,
+        /// Valid values (in minutes):
+        /// - 60 (OneHour)
+        /// - 1440 (OneDay, default)
+        /// - 4320 (ThreeDays)
+        /// - 10080 (OneWeek)
+        #[serde(default = "default_auto_archive", deserialize_with = "deserialize_auto_archive")]
+        auto_archive_duration: AutoArchiveDuration,
     },
 }
 
 /// Default auto-archive duration (24 hours)
-fn default_auto_archive() -> u16 {
-    1440
+fn default_auto_archive() -> AutoArchiveDuration {
+    AutoArchiveDuration::OneDay
+}
+
+/// Custom deserializer for AutoArchiveDuration from u16 minutes
+fn deserialize_auto_archive<'de, D>(deserializer: D) -> Result<AutoArchiveDuration, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let minutes = u16::deserialize(deserializer)?;
+    Ok(AutoArchiveDuration::from(minutes))
 }
 
 
@@ -193,7 +206,7 @@ mod tests {
         "Let's talk",
         false,
         false,
-        1440
+        AutoArchiveDuration::OneDay
     )]
     #[case::without_name(
         r#"{"actions":[{"type":"thread","content":"Message"}]}"#,
@@ -201,7 +214,7 @@ mod tests {
         "Message",
         false,
         false,
-        1440
+        AutoArchiveDuration::OneDay
     )]
     #[case::with_reply(
         r#"{"actions":[{"type":"thread","name":"Support","content":"Help needed","reply":true,"mention":true}]}"#,
@@ -209,7 +222,7 @@ mod tests {
         "Help needed",
         true,
         true,
-        1440
+        AutoArchiveDuration::OneDay
     )]
     #[case::custom_auto_archive(
         r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":60}]}"#,
@@ -217,7 +230,7 @@ mod tests {
         "Test",
         false,
         false,
-        60
+        AutoArchiveDuration::OneHour
     )]
     fn test_parse_thread_action(
         #[case] json: &str,
@@ -225,7 +238,7 @@ mod tests {
         #[case] expected_content: &str,
         #[case] expected_reply: bool,
         #[case] expected_mention: bool,
-        #[case] expected_auto_archive: u16,
+        #[case] expected_auto_archive: AutoArchiveDuration,
     ) {
         let response: EventResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.actions.len(), 1);

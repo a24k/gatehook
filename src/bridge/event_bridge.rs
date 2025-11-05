@@ -1,6 +1,6 @@
 use crate::adapters::{DiscordService, EventResponse, EventSender, ResponseAction};
 use anyhow::Context as _;
-use serenity::model::channel::Message;
+use serenity::model::channel::{AutoArchiveDuration, Message};
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -197,7 +197,7 @@ where
         content: &str,
         reply: bool,
         mention: bool,
-        auto_archive_duration: u16,
+        auto_archive_duration: AutoArchiveDuration,
     ) -> anyhow::Result<()> {
         // Check if DM (guild_id is None)
         if message.guild_id.is_none() {

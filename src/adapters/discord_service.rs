@@ -1,5 +1,5 @@
 use serenity::async_trait;
-use serenity::model::channel::{GuildChannel, Message};
+use serenity::model::channel::{AutoArchiveDuration, GuildChannel, Message};
 use serenity::model::id::{ChannelId, MessageId};
 
 /// Interface for Discord operations
@@ -46,13 +46,13 @@ pub trait DiscordService: Send + Sync {
     /// * `http` - The HTTP client from Context
     /// * `message` - The message to create a thread from
     /// * `name` - The thread name
-    /// * `auto_archive_duration` - Auto-archive duration in minutes
+    /// * `auto_archive_duration` - Auto-archive duration
     async fn create_thread_from_message(
         &self,
         http: &serenity::http::Http,
         message: &Message,
         name: &str,
-        auto_archive_duration: u16,
+        auto_archive_duration: AutoArchiveDuration,
     ) -> Result<GuildChannel, serenity::Error>;
 
     /// Send a message to a channel
