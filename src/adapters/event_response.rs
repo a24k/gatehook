@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use serenity::model::channel::AutoArchiveDuration;
 
 /// Response from webhook endpoint
 ///
@@ -17,14 +16,9 @@ pub struct EventResponse {
 /// Parameters for Reply action
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ReplyParams {
-    /// Reply content
-    ///
-    /// Content exceeding 2000 characters (Unicode code points) will be automatically truncated.
+    /// Reply content (any length accepted, truncated at execution if needed)
     pub content: String,
-    /// Whether to ping/mention the user
-    ///
-    /// - `true`: Notification will be sent to the replied user (`reply_ping`)
-    /// - `false`: Reply without notification (`reply`, default)
+    /// Whether to ping/mention the user (default: false)
     #[serde(default)]
     pub mention: bool,
 }
@@ -43,90 +37,39 @@ pub struct ReactParams {
 /// Parameters for Thread action
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ThreadParams {
-    /// Thread name (auto-generated if omitted)
-    ///
-    /// - 1-100 characters (Discord API limit)
-    /// - If omitted: Generated from first line of message (max 100 chars)
-    /// - Empty message fallback: "Thread"
-    /// - Ignored if already in thread
+    /// Thread name (auto-generated from message content if omitted)
     #[serde(default)]
     pub name: Option<String>,
-    /// Message content (2000 char limit, auto-truncated)
+    /// Message content (any length accepted, truncated at execution if needed)
     pub content: String,
-    /// Whether to post as a reply
-    ///
-    /// - `true`: Post as reply to the original message
-    /// - `false`: Post as normal message (default)
+    /// Whether to post as a reply (default: false)
     #[serde(default)]
     pub reply: bool,
-    /// Whether to mention the user (only effective when reply=true)
-    ///
-    /// - `true`: Mention the replied user
-    /// - `false`: No mention (default)
+    /// Whether to mention when replying (default: false)
     #[serde(default)]
     pub mention: bool,
-    /// Auto-archive duration
+    /// Auto-archive duration in minutes (default: 1440)
     ///
-    /// Valid values (in minutes):
-    /// - 60 (OneHour)
-    /// - 1440 (OneDay, default)
-    /// - 4320 (ThreeDays)
-    /// - 10080 (OneWeek)
-    #[serde(default = "default_auto_archive", deserialize_with = "deserialize_auto_archive")]
-    pub auto_archive_duration: AutoArchiveDuration,
+    /// Valid values: 60, 1440, 4320, 10080
+    #[serde(default = "default_auto_archive")]
+    pub auto_archive_duration: u16,
 }
 
-/// Action executable from webhook response
+/// Action to execute in response to a Discord event
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseAction {
-    /// Reply to a message
-    ///
-    /// # Context Requirements
-    /// This action requires message context (`message` handler only).
+    /// Reply to a message (requires message context)
     Reply(ReplyParams),
-    /// Add a reaction to a message
-    ///
-    /// # Context Requirements
-    /// This action requires message context (`message` handler only).
+    /// Add a reaction to a message (requires message context)
     React(ReactParams),
-    /// Create a thread or post to existing thread
-    ///
-    /// # Context Requirements
-    /// MESSAGE_GUILD only (not supported in DM).
-    ///
-    /// # Behavior
-    /// - **Normal channel**: Create new thread → Post message
-    ///   - `name: Some(...)`: Use specified name
-    ///   - `name: None`: Auto-generate from message content (max 100 chars)
-    /// - **Already in thread**: Post to current thread (name is ignored)
-    /// - **DM**: Error (not supported)
+    /// Create thread or post to existing thread (MESSAGE_GUILD only)
     Thread(ThreadParams),
 }
 
-/// Default auto-archive duration (24 hours)
-fn default_auto_archive() -> AutoArchiveDuration {
-    AutoArchiveDuration::OneDay
-}
-
-/// Custom deserializer for AutoArchiveDuration from u16 minutes
-///
-/// Validates and converts to known variants. Invalid values automatically
-/// fall back to the default (OneDay).
-fn deserialize_auto_archive<'de, D>(deserializer: D) -> Result<AutoArchiveDuration, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let minutes = u16::deserialize(deserializer)?;
-
-    // Convert to known variants, fallback to default for invalid values
-    match minutes {
-        60 => Ok(AutoArchiveDuration::OneHour),
-        1440 => Ok(AutoArchiveDuration::OneDay),
-        4320 => Ok(AutoArchiveDuration::ThreeDays),
-        10080 => Ok(AutoArchiveDuration::OneWeek),
-        _ => Ok(AutoArchiveDuration::OneDay), // Fallback to default
-    }
+/// Default auto-archive duration (1440 minutes = 24 hours)
+fn default_auto_archive() -> u16 {
+    1440
 }
 
 
@@ -229,7 +172,7 @@ mod tests {
         "Let's talk",
         false,
         false,
-        AutoArchiveDuration::OneDay
+        1440
     )]
     #[case::without_name(
         r#"{"actions":[{"type":"thread","content":"Message"}]}"#,
@@ -237,7 +180,7 @@ mod tests {
         "Message",
         false,
         false,
-        AutoArchiveDuration::OneDay
+        1440
     )]
     #[case::with_reply(
         r#"{"actions":[{"type":"thread","name":"Support","content":"Help needed","reply":true,"mention":true}]}"#,
@@ -245,7 +188,7 @@ mod tests {
         "Help needed",
         true,
         true,
-        AutoArchiveDuration::OneDay
+        1440
     )]
     #[case::custom_auto_archive(
         r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":60}]}"#,
@@ -253,7 +196,7 @@ mod tests {
         "Test",
         false,
         false,
-        AutoArchiveDuration::OneHour
+        60
     )]
     fn test_parse_thread_action(
         #[case] json: &str,
@@ -261,7 +204,7 @@ mod tests {
         #[case] expected_content: &str,
         #[case] expected_reply: bool,
         #[case] expected_mention: bool,
-        #[case] expected_auto_archive: AutoArchiveDuration,
+        #[case] expected_auto_archive: u16,
     ) {
         let response: EventResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.actions.len(), 1);
@@ -308,28 +251,25 @@ mod tests {
 
     #[test]
     fn test_parse_thread_invalid_auto_archive_duration() {
-        // Invalid duration (not 60, 1440, 4320, or 10080) falls back to default (OneDay)
+        // Invalid duration values are accepted as-is (validated at execution time)
         let json = r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":100}]}"#;
         let response: EventResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.actions.len(), 1);
 
         match &response.actions[0] {
             ResponseAction::Thread(params) => {
-                assert_eq!(params.auto_archive_duration, AutoArchiveDuration::OneDay);
+                assert_eq!(params.auto_archive_duration, 100);
             }
             _ => panic!("Expected Thread action"),
         }
     }
 
     #[rstest]
-    #[case::one_hour(60, AutoArchiveDuration::OneHour)]
-    #[case::one_day(1440, AutoArchiveDuration::OneDay)]
-    #[case::three_days(4320, AutoArchiveDuration::ThreeDays)]
-    #[case::one_week(10080, AutoArchiveDuration::OneWeek)]
-    fn test_parse_thread_valid_auto_archive_durations(
-        #[case] duration_minutes: u16,
-        #[case] expected: AutoArchiveDuration,
-    ) {
+    #[case::one_hour(60)]
+    #[case::one_day(1440)]
+    #[case::three_days(4320)]
+    #[case::one_week(10080)]
+    fn test_parse_thread_valid_auto_archive_durations(#[case] duration_minutes: u16) {
         let json = format!(
             r#"{{"actions":[{{"type":"thread","content":"Test","auto_archive_duration":{}}}]}}"#,
             duration_minutes
@@ -339,7 +279,7 @@ mod tests {
 
         match &response.actions[0] {
             ResponseAction::Thread(params) => {
-                assert_eq!(params.auto_archive_duration, expected);
+                assert_eq!(params.auto_archive_duration, duration_minutes);
             }
             _ => panic!("Expected Thread action"),
         }

@@ -124,6 +124,13 @@ where
     }
 
     /// Execute Reply action
+    ///
+    /// # Content Handling
+    /// - Content exceeding 2000 characters is truncated with warning log
+    ///
+    /// # Mention
+    /// - `params.mention = true`: Reply with ping (user receives notification)
+    /// - `params.mention = false`: Reply without ping (default)
     async fn execute_reply(
         &self,
         http: &serenity::http::Http,
@@ -148,6 +155,10 @@ where
     }
 
     /// Execute React action
+    ///
+    /// # Emoji Format
+    /// - Unicode emoji: "👍", "🎉", etc.
+    /// - Custom emoji: "name:id" format (e.g., "customemoji:123456789")
     async fn execute_react(
         &self,
         http: &serenity::http::Http,
@@ -169,6 +180,19 @@ where
     }
 
     /// Execute Thread action
+    ///
+    /// # Thread Name
+    /// - `params.name = Some(...)`: Use specified name
+    /// - `params.name = None`: Auto-generate from first line of message (max 100 chars)
+    ///   - Falls back to "Thread" if message content is empty
+    /// - Name is ignored if already in a thread
+    ///
+    /// # Content Handling
+    /// - Content exceeding 2000 characters is truncated with warning log
+    ///
+    /// # Auto-archive Duration
+    /// - Valid values: 60, 1440, 4320, 10080 (minutes)
+    /// - Invalid values fall back to 1440 (OneDay) with warning log
     async fn execute_thread(
         &self,
         http: &serenity::http::Http,
@@ -203,13 +227,29 @@ where
                 .map(|n| n.to_string())
                 .unwrap_or_else(|| generate_thread_name(message));
 
+            // Convert auto_archive_duration to enum
+            use serenity::model::channel::AutoArchiveDuration;
+            let auto_archive_duration = match params.auto_archive_duration {
+                60 => AutoArchiveDuration::OneHour,
+                1440 => AutoArchiveDuration::OneDay,
+                4320 => AutoArchiveDuration::ThreeDays,
+                10080 => AutoArchiveDuration::OneWeek,
+                invalid => {
+                    warn!(
+                        invalid_value = invalid,
+                        "Invalid auto_archive_duration, using default (1440 = OneDay)"
+                    );
+                    AutoArchiveDuration::OneDay
+                }
+            };
+
             let thread = self
                 .discord_service
                 .create_thread_from_message(
                     http,
                     message,
                     &thread_name,
-                    params.auto_archive_duration,
+                    auto_archive_duration,
                 )
                 .await
                 .context("Failed to create thread")?;
@@ -257,6 +297,9 @@ where
 }
 
 /// Truncate content to Discord's 2000 character limit
+///
+/// If content exceeds limit, truncates to 1997 chars and appends "..."
+/// Logs warning with original and truncated length.
 fn truncate_content(content: &str) -> String {
     const MAX_LEN: usize = 2000;
 
@@ -279,6 +322,9 @@ fn truncate_content(content: &str) -> String {
 }
 
 /// Generate thread name from message content
+///
+/// Uses first line of message content (max 100 chars, Discord API limit).
+/// Returns "Thread" if content is empty after trimming.
 fn generate_thread_name(message: &Message) -> String {
     const MAX_LEN: usize = 100; // Discord API maximum
 

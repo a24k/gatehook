@@ -7,7 +7,7 @@ use adapters::{MockDiscordService, MockEventSender};
 use gatehook::adapters::{ReactParams, ReplyParams, ThreadParams};
 use gatehook::bridge::event_bridge::EventBridge;
 use rstest::rstest;
-use serenity::model::channel::{AutoArchiveDuration, Message};
+use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::model::user::User;
 use std::sync::Arc;
@@ -258,7 +258,7 @@ async fn test_execute_actions_thread_create_new() {
             content: "Let's discuss".to_string(),
             reply: false,
             mention: false,
-            auto_archive_duration: AutoArchiveDuration::OneDay,
+            auto_archive_duration: 1440,
         })],
     };
 
@@ -272,7 +272,8 @@ async fn test_execute_actions_thread_create_new() {
     assert_eq!(threads.len(), 1, "Should create one thread");
     assert_eq!(threads[0].name, "Discussion");
     assert_eq!(threads[0].message_id, MessageId::new(111));
-    assert_eq!(threads[0].auto_archive_duration, AutoArchiveDuration::OneDay);
+    // auto_archive_duration is converted to enum at execution time
+    assert_eq!(threads[0].auto_archive_duration, serenity::model::channel::AutoArchiveDuration::OneDay);
 
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1, "Should send one message");
@@ -301,7 +302,7 @@ async fn test_execute_actions_thread_auto_name() {
             content: "Response".to_string(),
             reply: false,
             mention: false,
-            auto_archive_duration: AutoArchiveDuration::OneDay,
+            auto_archive_duration: 1440,
         })],
     };
 
@@ -336,7 +337,7 @@ async fn test_execute_actions_thread_already_in_thread() {
             content: "Reply in thread".to_string(),
             reply: false,
             mention: false,
-            auto_archive_duration: AutoArchiveDuration::OneDay,
+            auto_archive_duration: 1440,
         })],
     };
 
@@ -375,7 +376,7 @@ async fn test_execute_actions_thread_with_reply() {
             content: "Help needed".to_string(),
             reply: true,
             mention: true,
-            auto_archive_duration: AutoArchiveDuration::OneHour,
+            auto_archive_duration: 60,
         })],
     };
 
@@ -415,7 +416,7 @@ async fn test_execute_actions_thread_in_dm_fails() {
             content: "Content".to_string(),
             reply: false,
             mention: false,
-            auto_archive_duration: AutoArchiveDuration::OneDay,
+            auto_archive_duration: 1440,
         })],
     };
 
@@ -458,7 +459,7 @@ async fn test_execute_actions_mixed_types() {
                 content: "Thread content".to_string(),
                 reply: false,
                 mention: false,
-                auto_archive_duration: AutoArchiveDuration::OneDay,
+                auto_archive_duration: 1440,
             }),
         ],
     };
