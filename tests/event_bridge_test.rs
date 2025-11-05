@@ -276,6 +276,7 @@ async fn test_execute_actions_thread_create_new() {
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1, "Should send one message");
     assert_eq!(messages[0].content, "Let's discuss");
+    assert_eq!(messages[0].channel_id, ChannelId::new(222));
     assert_eq!(messages[0].reply_to, None);
 }
 
@@ -350,6 +351,7 @@ async fn test_execute_actions_thread_already_in_thread() {
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1, "Should send message to existing thread");
     assert_eq!(messages[0].content, "Reply in thread");
+    assert_eq!(messages[0].channel_id, ChannelId::new(222));
 }
 
 #[tokio::test]
@@ -388,8 +390,9 @@ async fn test_execute_actions_thread_with_reply() {
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].content, "Help needed");
+    assert_eq!(messages[0].channel_id, ChannelId::new(222));
     assert_eq!(messages[0].reply_to, Some(MessageId::new(111)));
-    assert_eq!(messages[0].mention, true);
+    assert!(messages[0].mention);
 }
 
 #[tokio::test]
