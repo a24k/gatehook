@@ -121,7 +121,7 @@ impl EventHandler for Handler {
                 // Execute actions if webhook responded with any
                 if let Err(err) = self
                     .bridge
-                    .execute_actions(&ctx, &message, &event_response)
+                    .execute_actions(&ctx.http, &message, &event_response)
                     .await
                 {
                     error!(?err, "Failed to execute actions from webhook response");
@@ -191,9 +191,8 @@ fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
 
     // Guild Message events
     if params.has_guild_message_events() {
-        intents |= GatewayIntents::GUILDS;           // Guild/channel/thread info for cache
-        intents |= GatewayIntents::GUILD_MESSAGES;   // Guild message events
-        intents |= GatewayIntents::MESSAGE_CONTENT;  // Message content access
+        intents |= GatewayIntents::GUILD_MESSAGES;
+        intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 
     intents
