@@ -6,7 +6,7 @@ use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Bridge Discord Gateway events to external endpoints
 pub struct EventBridge<D, S>
@@ -51,6 +51,13 @@ where
         &self,
         message: &Message,
     ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            message_id = %message.id,
+            author = %message.author.name,
+            content = %message.content,
+            "Processing message event"
+        );
+
         // Forward event to webhook endpoint and return response
         self.event_sender
             .send("message", message)
@@ -68,6 +75,11 @@ where
     ///
     /// Response from webhook (may contain actions)
     pub async fn handle_ready(&self, ready: &Ready) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            user = %ready.user.display_name(),
+            "Processing ready event"
+        );
+
         // Forward event to webhook endpoint and return response
         self.event_sender
             .send("ready", ready)
