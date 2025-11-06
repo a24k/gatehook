@@ -220,11 +220,10 @@ where
             message.channel_id
         } else {
             // Normal channel → create new thread
-            let thread_name = params
-                .name
-                .as_ref()
-                .map(|n| n.to_string())
-                .unwrap_or_else(|| generate_thread_name(message));
+            let thread_name = match &params.name {
+                Some(name) => truncate_thread_name(name),
+                None => generate_thread_name(message),
+            };
 
             // Convert auto_archive_duration to enum
             use serenity::model::channel::AutoArchiveDuration;
@@ -325,8 +324,6 @@ fn truncate_content(content: &str) -> String {
 /// Uses first line of message content (max 100 chars, Discord API limit).
 /// Returns "Thread" if content is empty after trimming.
 fn generate_thread_name(message: &Message) -> String {
-    const MAX_LEN: usize = 100; // Discord API maximum
-
     // Use first line only, trim whitespace
     let content = message
         .content
@@ -339,12 +336,21 @@ fn generate_thread_name(message: &Message) -> String {
         return "Thread".to_string();
     }
 
-    let char_count = content.chars().count();
+    truncate_thread_name(content)
+}
+
+/// Truncate thread name to Discord's 100 character limit
+///
+/// If name exceeds limit, truncates to 100 chars.
+fn truncate_thread_name(name: &str) -> String {
+    const MAX_LEN: usize = 100; // Discord API maximum
+
+    let char_count = name.chars().count();
 
     if char_count <= MAX_LEN {
-        content.to_string()
+        name.to_string()
     } else {
         // Truncate to API limit
-        content.chars().take(MAX_LEN).collect()
+        name.chars().take(MAX_LEN).collect()
     }
 }

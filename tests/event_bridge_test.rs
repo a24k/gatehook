@@ -318,6 +318,44 @@ async fn test_execute_actions_thread_auto_name() {
 }
 
 #[tokio::test]
+async fn test_execute_actions_thread_long_name() {
+    use gatehook::adapters::{EventResponse, ResponseAction};
+
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    discord_service.set_is_thread(false);
+    let event_sender = Arc::new(MockEventSender::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+
+    let http = serenity::http::Http::new("dummy_token");
+    let message = create_guild_message("Original message", 111, 222, 333);
+
+    // Thread action with name exceeding 100 chars (should be truncated)
+    let long_name = "a".repeat(150); // 150 characters
+    let event_response = EventResponse {
+        actions: vec![ResponseAction::Thread(ThreadParams {
+            name: Some(long_name),
+            content: "Response".to_string(),
+            reply: false,
+            mention: false,
+            auto_archive_duration: 1440,
+        })],
+    };
+
+    // Execute
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    let threads = discord_service.get_threads();
+    assert_eq!(threads.len(), 1);
+    // Name should be truncated to 100 characters
+    assert_eq!(threads[0].name.chars().count(), 100);
+    assert_eq!(threads[0].name, "a".repeat(100));
+}
+
+#[tokio::test]
 async fn test_execute_actions_thread_already_in_thread() {
     use gatehook::adapters::{EventResponse, ResponseAction};
 
