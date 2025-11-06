@@ -140,7 +140,7 @@ where
         let content = truncate_content(&params.content);
 
         self.discord_service
-            .reply_to_message(http, message.channel_id, message.id, &content, params.mention)
+            .reply_in_channel(http, message.channel_id, message.id, &content, params.mention)
             .await
             .context("Failed to send reply to Discord")?;
 

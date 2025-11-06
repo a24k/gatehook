@@ -82,23 +82,6 @@ impl MockDiscordService {
 
 #[async_trait]
 impl DiscordService for MockDiscordService {
-    async fn reply_to_message(
-        &self,
-        _http: &serenity::http::Http,
-        channel_id: ChannelId,
-        message_id: MessageId,
-        content: &str,
-        mention: bool,
-    ) -> Result<(), serenity::Error> {
-        self.replies.lock().unwrap().push(RecordedReply {
-            channel_id,
-            message_id,
-            content: content.to_string(),
-            mention,
-        });
-        Ok(())
-    }
-
     async fn react_to_message(
         &self,
         _http: &serenity::http::Http,
@@ -157,6 +140,14 @@ impl DiscordService for MockDiscordService {
         content: &str,
         mention: bool,
     ) -> Result<Message, serenity::Error> {
+        // Record in both replies and messages for backward compatibility
+        self.replies.lock().unwrap().push(RecordedReply {
+            channel_id,
+            message_id,
+            content: content.to_string(),
+            mention,
+        });
+
         self.messages.lock().unwrap().push(RecordedMessage {
             channel_id,
             content: content.to_string(),
