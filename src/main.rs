@@ -121,7 +121,7 @@ impl EventHandler for Handler {
                 // Execute actions if webhook responded with any
                 if let Err(err) = self
                     .bridge
-                    .execute_actions(&ctx.http, &message, &event_response)
+                    .execute_actions(&ctx, &message, &event_response)
                     .await
                 {
                     error!(?err, "Failed to execute actions from webhook response");
