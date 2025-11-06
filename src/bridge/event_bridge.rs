@@ -298,6 +298,11 @@ where
 
         let is_in_thread = if let Some(kind) = channel_kind_from_cache {
             // Cache hit - fast path (no await needed)
+            debug!(
+                channel_id = %message.channel_id,
+                guild_id = %guild_id,
+                "Cache HIT: Channel type detected from cache (fast path)"
+            );
             matches!(
                 kind,
                 ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread
@@ -305,9 +310,16 @@ where
         } else {
             // Cache miss - fallback to API call
             if ctx.cache.guild(guild_id).is_none() {
-                debug!(guild_id = %guild_id, "Guild not in cache, using API call");
+                debug!(
+                    guild_id = %guild_id,
+                    "Cache MISS: Guild not in cache, using API call (slow path)"
+                );
             } else {
-                debug!(channel_id = %message.channel_id, "Channel not in guild cache, using API call");
+                debug!(
+                    channel_id = %message.channel_id,
+                    guild_id = %guild_id,
+                    "Cache MISS: Channel not in guild cache, using API call (slow path)"
+                );
             }
 
             self.discord_service
