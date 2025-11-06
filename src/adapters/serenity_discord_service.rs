@@ -42,9 +42,25 @@ impl DiscordService for SerenityDiscordService {
         http: &serenity::http::Http,
         message: &Message,
         name: &str,
-        auto_archive_duration: AutoArchiveDuration,
+        auto_archive_duration: u16,
     ) -> Result<GuildChannel, serenity::Error> {
         use serenity::builder::CreateThread;
+        use tracing::warn;
+
+        // Convert auto_archive_duration to enum
+        let auto_archive_duration = match auto_archive_duration {
+            60 => AutoArchiveDuration::OneHour,
+            1440 => AutoArchiveDuration::OneDay,
+            4320 => AutoArchiveDuration::ThreeDays,
+            10080 => AutoArchiveDuration::OneWeek,
+            invalid => {
+                warn!(
+                    invalid_value = invalid,
+                    "Invalid auto_archive_duration, using default (1440 = OneDay)"
+                );
+                AutoArchiveDuration::OneDay
+            }
+        };
 
         let builder = CreateThread::new(name.to_string())
             .auto_archive_duration(auto_archive_duration);

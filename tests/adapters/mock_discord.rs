@@ -1,6 +1,6 @@
 use gatehook::adapters::DiscordService;
 use serenity::async_trait;
-use serenity::model::channel::{AutoArchiveDuration, GuildChannel, Message};
+use serenity::model::channel::{GuildChannel, Message};
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use std::sync::{Arc, Mutex};
 
@@ -31,7 +31,7 @@ pub struct RecordedReaction {
 pub struct RecordedThread {
     pub message_id: MessageId,
     pub name: String,
-    pub auto_archive_duration: AutoArchiveDuration,
+    pub auto_archive_duration: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -102,7 +102,7 @@ impl DiscordService for MockDiscordService {
         _http: &serenity::http::Http,
         message: &Message,
         name: &str,
-        auto_archive_duration: AutoArchiveDuration,
+        auto_archive_duration: u16,
     ) -> Result<GuildChannel, serenity::Error> {
         self.threads.lock().unwrap().push(RecordedThread {
             message_id: message.id,

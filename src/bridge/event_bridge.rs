@@ -7,7 +7,7 @@ use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// Bridge Discord Gateway events to external endpoints
 pub struct EventBridge<D, S>
@@ -222,29 +222,13 @@ where
                 None => generate_thread_name(message),
             };
 
-            // Convert auto_archive_duration to enum
-            use serenity::model::channel::AutoArchiveDuration;
-            let auto_archive_duration = match params.auto_archive_duration {
-                60 => AutoArchiveDuration::OneHour,
-                1440 => AutoArchiveDuration::OneDay,
-                4320 => AutoArchiveDuration::ThreeDays,
-                10080 => AutoArchiveDuration::OneWeek,
-                invalid => {
-                    warn!(
-                        invalid_value = invalid,
-                        "Invalid auto_archive_duration, using default (1440 = OneDay)"
-                    );
-                    AutoArchiveDuration::OneDay
-                }
-            };
-
             let thread = self
                 .discord_service
                 .create_thread_from_message(
                     http,
                     message,
                     &thread_name,
-                    auto_archive_duration,
+                    params.auto_archive_duration,
                 )
                 .await
                 .context("Failed to create thread")?;

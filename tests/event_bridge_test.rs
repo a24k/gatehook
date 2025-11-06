@@ -272,8 +272,7 @@ async fn test_execute_actions_thread_create_new() {
     assert_eq!(threads.len(), 1, "Should create one thread");
     assert_eq!(threads[0].name, "Discussion");
     assert_eq!(threads[0].message_id, MessageId::new(111));
-    // auto_archive_duration is converted to enum at execution time
-    assert_eq!(threads[0].auto_archive_duration, serenity::model::channel::AutoArchiveDuration::OneDay);
+    assert_eq!(threads[0].auto_archive_duration, 1440);
 
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1, "Should send one message");
