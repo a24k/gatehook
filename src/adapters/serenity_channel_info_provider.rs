@@ -25,24 +25,26 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
             cache
                 .guilds()
                 .iter()
-                .find_map(|guild_ref| {
-                    guild_ref
-                        .channels
-                        .get(&channel_id)
-                        .map(|channel| {
-                            let is_thread = matches!(
-                                channel.kind,
-                                ChannelType::PublicThread
-                                    | ChannelType::PrivateThread
-                                    | ChannelType::NewsThread
-                            );
-                            debug!(
-                                channel_id = %channel_id,
-                                is_thread = is_thread,
-                                "Channel type resolved from cache"
-                            );
-                            is_thread
-                        })
+                .find_map(|guild_id| {
+                    cache.guild(*guild_id).and_then(|guild_ref| {
+                        guild_ref
+                            .channels
+                            .get(&channel_id)
+                            .map(|channel| {
+                                let is_thread = matches!(
+                                    channel.kind,
+                                    ChannelType::PublicThread
+                                        | ChannelType::PrivateThread
+                                        | ChannelType::NewsThread
+                                );
+                                debug!(
+                                    channel_id = %channel_id,
+                                    is_thread = is_thread,
+                                    "Channel type resolved from cache"
+                                );
+                                is_thread
+                            })
+                    })
                 })
         }; // Cache references are dropped here
 

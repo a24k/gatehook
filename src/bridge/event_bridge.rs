@@ -92,8 +92,7 @@ where
             cache.guild(guild_id).and_then(|guild| {
                 guild
                     .channels
-                    .get(&message.channel_id)
-                    .map(|ch| ch.clone())
+                    .get(&message.channel_id).cloned()
             })
         });
 
