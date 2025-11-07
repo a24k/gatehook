@@ -145,8 +145,69 @@ Events are forwarded to your HTTP endpoint as JSON POST requests:
   "event_type": "message",
   "payload": {
     // Discord event data (serenity Message struct serialized)
+    // For message events, includes optional channel metadata (see below)
   }
 }
+```
+
+### Message Event Payload with Channel Information
+
+For `message` events in guilds, the payload includes a `channel` field with metadata about the channel:
+
+```json
+{
+  "event_type": "message",
+  "payload": {
+    "id": "123456789012345678",
+    "content": "Hello!",
+    "author": { ... },
+    // ... other Message fields ...
+    "channel": {
+      "id": "987654321098765432",
+      "name": "general",
+      "kind": "Text",
+      "parent_id": null,
+      "topic": "General discussion",
+      // ... other GuildChannel fields ...
+    }
+  }
+}
+```
+
+**The `channel` field:**
+- **Present:** For guild (server) messages when `MESSAGE_GUILD` is enabled
+- **Absent:** For direct messages, or if channel information is not available in cache
+
+**Detecting threads:**
+Check the `channel.kind` field:
+- `"PublicThread"` - Public thread
+- `"PrivateThread"` - Private thread
+- `"NewsThread"` - News/Announcement thread
+- `"Text"` - Regular text channel
+- `"Voice"` - Voice channel
+- Other types: `"Category"`, `"News"`, `"Stage"`, `"Forum"`, etc.
+
+**Available channel fields** (from Discord's [GuildChannel](https://discord.com/developers/docs/resources/channel#channel-object)):
+- `id` - Channel ID
+- `name` - Channel name
+- `kind` - Channel type (see above)
+- `position` - Sorting position
+- `parent_id` - Parent category ID (null for top-level channels)
+- `topic` - Channel topic/description (if set)
+- `nsfw` - Whether channel is NSFW
+- `thread_metadata` - Thread-specific metadata (if channel is a thread)
+- And more...
+
+**Example: Checking if message is in a thread**
+```python
+# Python example
+def is_in_thread(payload):
+    channel = payload.get("channel")
+    if not channel:
+        return False  # DM or no channel info
+
+    kind = channel.get("kind")
+    return kind in ["PublicThread", "PrivateThread", "NewsThread"]
 ```
 
 ## Webhook Response Actions
@@ -385,7 +446,8 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 
 ### Guilds & Channels
 
-- **GUILDS**
+- **GUILDS** *(Auto-enabled with MESSAGE_GUILD)*
+  - [x] Automatically enabled for cache access (guild/channel metadata)
   - [ ] `GUILD_CREATE` `GUILD_UPDATE` `GUILD_DELETE`
   - [ ] `GUILD_ROLE_CREATE` `GUILD_ROLE_UPDATE` `GUILD_ROLE_DELETE`
   - [ ] `CHANNEL_CREATE` `CHANNEL_UPDATE` `CHANNEL_DELETE`
