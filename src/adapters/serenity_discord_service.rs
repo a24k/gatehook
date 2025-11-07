@@ -100,19 +100,4 @@ impl DiscordService for SerenityDiscordService {
 
         channel_id.send_message(http, builder).await
     }
-
-    async fn is_thread_channel(
-        &self,
-        http: &serenity::http::Http,
-        channel_id: ChannelId,
-    ) -> Result<bool, serenity::Error> {
-        let channel = http.get_channel(channel_id).await?;
-        Ok(matches!(
-            channel,
-            Channel::Guild(ref c) if matches!(
-                c.kind,
-                ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread
-            )
-        ))
-    }
 }

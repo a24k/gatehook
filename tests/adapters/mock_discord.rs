@@ -9,7 +9,6 @@ pub struct MockDiscordService {
     pub reactions: Arc<Mutex<Vec<RecordedReaction>>>,
     pub threads: Arc<Mutex<Vec<RecordedThread>>>,
     pub messages: Arc<Mutex<Vec<RecordedMessage>>>,
-    pub is_thread: Arc<Mutex<bool>>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,12 +53,7 @@ impl MockDiscordService {
             reactions: Arc::new(Mutex::new(Vec::new())),
             threads: Arc::new(Mutex::new(Vec::new())),
             messages: Arc::new(Mutex::new(Vec::new())),
-            is_thread: Arc::new(Mutex::new(false)),
         }
-    }
-
-    pub fn set_is_thread(&self, value: bool) {
-        *self.is_thread.lock().unwrap() = value;
     }
 
     pub fn get_replies(&self) -> Vec<RecordedReply> {
@@ -154,14 +148,6 @@ impl DiscordService for MockDiscordService {
 
         // Return a dummy Message
         Ok(create_dummy_message(channel_id, content))
-    }
-
-    async fn is_thread_channel(
-        &self,
-        _http: &serenity::http::Http,
-        _channel_id: ChannelId,
-    ) -> Result<bool, serenity::Error> {
-        Ok(*self.is_thread.lock().unwrap())
     }
 }
 

@@ -68,16 +68,4 @@ pub trait DiscordService: Send + Sync {
         content: &str,
         mention: bool,
     ) -> Result<Message, serenity::Error>;
-
-    /// Check if a channel is a thread
-    ///
-    /// # Arguments
-    ///
-    /// * `http` - The HTTP client from Context
-    /// * `channel_id` - The channel ID to check
-    async fn is_thread_channel(
-        &self,
-        http: &serenity::http::Http,
-        channel_id: ChannelId,
-    ) -> Result<bool, serenity::Error>;
 }

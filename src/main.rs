@@ -193,6 +193,8 @@ fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
     if params.has_guild_message_events() {
         intents |= GatewayIntents::GUILD_MESSAGES;
         intents |= GatewayIntents::MESSAGE_CONTENT;
+        // GUILDS intent is required for cache access (guild/channel data)
+        intents |= GatewayIntents::GUILDS;
     }
 
     intents
