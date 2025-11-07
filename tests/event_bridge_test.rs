@@ -49,7 +49,6 @@ async fn test_execute_actions_reply(
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let cache = serenity::cache::Cache::default();
     let http = serenity::http::Http::new("dummy_token");
     let cache = serenity::cache::Cache::default();
     let message = create_test_message("Test message", 111, 222);
