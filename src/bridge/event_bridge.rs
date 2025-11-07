@@ -143,20 +143,18 @@ where
     ///
     /// # Arguments
     ///
-    /// * `cache` - The cache from Context (for channel info lookups)
     /// * `http` - The HTTP client for Discord API calls
     /// * `message` - The message that triggered the event (for context)
     /// * `event_response` - The response from webhook containing actions
     pub async fn execute_actions(
         &self,
-        cache: &serenity::cache::Cache,
         http: &serenity::http::Http,
         message: &Message,
         event_response: &EventResponse,
     ) -> anyhow::Result<()> {
         for action in &event_response.actions {
             // Execute action (log error and continue with next)
-            if let Err(err) = self.execute_action(cache, http, message, action).await {
+            if let Err(err) = self.execute_action(http, message, action).await {
                 error!(?err, ?action, "Failed to execute action, continuing with next");
             }
         }
@@ -166,7 +164,6 @@ where
     /// Execute a single action
     async fn execute_action(
         &self,
-        cache: &serenity::cache::Cache,
         http: &serenity::http::Http,
         message: &Message,
         action: &ResponseAction,
@@ -174,7 +171,7 @@ where
         match action {
             ResponseAction::Reply(params) => self.execute_reply(http, message, params).await,
             ResponseAction::React(params) => self.execute_react(http, message, params).await,
-            ResponseAction::Thread(params) => self.execute_thread(cache, http, message, params).await,
+            ResponseAction::Thread(params) => self.execute_thread(http, message, params).await,
         }
     }
 
@@ -250,7 +247,6 @@ where
     /// - Invalid values fall back to 1440 (OneDay) with warning log
     async fn execute_thread(
         &self,
-        cache: &serenity::cache::Cache,
         http: &serenity::http::Http,
         message: &Message,
         params: &ThreadParams,
@@ -261,7 +257,7 @@ where
 
         // Check if already in thread (cache-first with API fallback)
         let is_in_thread = self.channel_info
-            .is_thread(cache, http, Some(guild_id), message.channel_id)
+            .is_thread(http, Some(guild_id), message.channel_id)
             .await
             .context("Failed to check if channel is thread")?;
 

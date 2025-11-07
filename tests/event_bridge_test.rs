@@ -50,7 +50,6 @@ async fn test_execute_actions_reply(
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("Test message", 111, 222);
 
     // Create EventResponse with reply action
@@ -62,7 +61,7 @@ async fn test_execute_actions_reply(
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -86,7 +85,6 @@ async fn test_execute_actions_multiple_replies() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("Test", 555, 666);
 
     // Multiple actions
@@ -104,7 +102,7 @@ async fn test_execute_actions_multiple_replies() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -127,7 +125,6 @@ async fn test_execute_actions_long_content_truncated() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("Test", 777, 888);
 
     // Create content over 2000 chars
@@ -141,7 +138,7 @@ async fn test_execute_actions_long_content_truncated() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -168,8 +165,8 @@ async fn test_handle_message_with_webhook_response() {
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("Hello", 999, 1000);
+    let cache = serenity::cache::Cache::default();
 
     // Execute handle_message (which should return the EventResponse)
     let result = bridge.handle_message(&cache, &message).await;
@@ -204,7 +201,6 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("Test message", 111, 222);
 
     // Create EventResponse with react action
@@ -215,7 +211,7 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -239,7 +235,6 @@ async fn test_execute_actions_thread_create_new() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("Original message", 111, 222, 333);
 
     // Create EventResponse with thread action
@@ -252,7 +247,7 @@ async fn test_execute_actions_thread_create_new() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -282,7 +277,6 @@ async fn test_execute_actions_thread_auto_name() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("This is the original message content", 111, 222, 333);
 
     // Thread action without name (should auto-generate)
@@ -295,7 +289,7 @@ async fn test_execute_actions_thread_auto_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -317,7 +311,6 @@ async fn test_execute_actions_thread_long_name() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("Original message", 111, 222, 333);
 
     // Thread action with name exceeding 100 chars (should be truncated)
@@ -331,7 +324,7 @@ async fn test_execute_actions_thread_long_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -355,7 +348,6 @@ async fn test_execute_actions_thread_already_in_thread() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("Thread message", 111, 222, 333);
 
     // Thread action (should skip thread creation)
@@ -368,7 +360,7 @@ async fn test_execute_actions_thread_already_in_thread() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -394,7 +386,6 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("Original", 111, 222, 333);
 
     // Thread action with custom auto_archive_duration
@@ -407,7 +398,7 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -436,7 +427,6 @@ async fn test_execute_actions_thread_in_dm_fails() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_test_message("DM message", 111, 222); // No guild_id
 
     // Thread action
@@ -449,7 +439,7 @@ async fn test_execute_actions_thread_in_dm_fails() {
     };
 
     // Execute (should complete but log error)
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // execute_actions continues on error, so result is Ok
     assert!(result.is_ok());
@@ -471,7 +461,6 @@ async fn test_execute_actions_mixed_types() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let http = serenity::http::Http::new("dummy_token");
-    let cache = serenity::cache::Cache::default();
     let message = create_guild_message("Test", 111, 222, 333);
 
     // Multiple different action types
@@ -493,7 +482,7 @@ async fn test_execute_actions_mixed_types() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());

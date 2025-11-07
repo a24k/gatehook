@@ -2,18 +2,28 @@ use super::channel_info_provider::ChannelInfoProvider;
 use serenity::async_trait;
 use serenity::model::channel::{Channel, ChannelType};
 use serenity::model::id::ChannelId;
+use std::sync::Arc;
 use tracing::debug;
 
 /// Implementation for channel information retrieval via Serenity
 ///
 /// Uses cache-first approach with API fallback for optimal performance.
-pub struct SerenityChannelInfoProvider;
+/// Holds a reference to the cache that is updated by Serenity's event loop.
+pub struct SerenityChannelInfoProvider {
+    cache: Arc<serenity::cache::Cache>,
+}
+
+impl SerenityChannelInfoProvider {
+    /// Create a new SerenityChannelInfoProvider with a cache reference
+    pub fn new(cache: Arc<serenity::cache::Cache>) -> Self {
+        Self { cache }
+    }
+}
 
 #[async_trait]
 impl ChannelInfoProvider for SerenityChannelInfoProvider {
     async fn is_thread(
         &self,
-        cache: &serenity::cache::Cache,
         http: &serenity::http::Http,
         guild_id: Option<serenity::model::id::GuildId>,
         channel_id: ChannelId,
@@ -22,7 +32,7 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
         // Extract channel kind from cache without holding the lock across await points
         let cached_result: Option<bool> = if let Some(gid) = guild_id {
             // Direct guild access (O(1) - fast)
-            cache.guild(gid).and_then(|guild_ref| {
+            self.cache.guild(gid).and_then(|guild_ref| {
                 guild_ref.channels.get(&channel_id).map(|channel| {
                     let is_thread = matches!(
                         channel.kind,
@@ -41,8 +51,8 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
             })
         } else {
             // Search all guilds (O(n) - slower fallback)
-            cache.guilds().iter().find_map(|guild_id| {
-                cache.guild(*guild_id).and_then(|guild_ref| {
+            self.cache.guilds().iter().find_map(|guild_id| {
+                self.cache.guild(*guild_id).and_then(|guild_ref| {
                     guild_ref.channels.get(&channel_id).map(|channel| {
                         let is_thread = matches!(
                             channel.kind,
