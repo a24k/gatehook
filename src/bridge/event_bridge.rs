@@ -3,6 +3,7 @@ use crate::adapters::{
     ResponseAction, ThreadParams,
 };
 use crate::bridge::discord_text::{generate_thread_name, truncate_content, truncate_thread_name};
+use crate::bridge::message_payload::MessagePayload;
 use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -48,6 +49,7 @@ where
     ///
     /// # Arguments
     ///
+    /// * `cache` - The cache from Context (for retrieving channel information)
     /// * `message` - The message event from Discord
     ///
     /// # Returns
@@ -55,6 +57,7 @@ where
     /// Response from webhook (may contain actions)
     pub async fn handle_message(
         &self,
+        cache: &serenity::cache::Cache,
         message: &Message,
     ) -> anyhow::Result<Option<EventResponse>> {
         debug!(
@@ -64,11 +67,55 @@ where
             "Processing message event"
         );
 
+        // Build payload with channel information from cache
+        let payload = self.build_message_payload(cache, message);
+
         // Forward event to webhook endpoint and return response
         self.event_sender
-            .send("message", message)
+            .send("message", &payload)
             .await
             .context("Failed to send message event to HTTP endpoint")
+    }
+
+    /// Build MessagePayload with channel information from cache
+    ///
+    /// Attempts to retrieve GuildChannel from cache (fast path).
+    /// If not available (DM or cache miss), creates payload without channel info.
+    fn build_message_payload<'a>(
+        &self,
+        cache: &serenity::cache::Cache,
+        message: &'a Message,
+    ) -> MessagePayload<'a> {
+        // Try to get channel from cache (guild messages only)
+        let channel = message.guild_id.and_then(|guild_id| {
+            // Extract channel from cache without holding lock across operations
+            cache.guild(guild_id).and_then(|guild| {
+                guild
+                    .channels
+                    .get(&message.channel_id)
+                    .map(|ch| ch.clone())
+            })
+        });
+
+        match channel {
+            Some(ch) => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    channel_name = %ch.name,
+                    channel_kind = ?ch.kind,
+                    "Channel information retrieved from cache"
+                );
+                MessagePayload::with_channel(message, ch)
+            }
+            None => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    guild_id = ?message.guild_id,
+                    "Channel information not available (DM or cache miss)"
+                );
+                MessagePayload::new(message)
+            }
+        }
     }
 
     /// Handle a ready event

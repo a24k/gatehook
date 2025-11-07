@@ -1,38 +1,46 @@
 use serde::Serialize;
-use serenity::model::channel::Message;
+use serenity::model::channel::{GuildChannel, Message};
 
 /// Payload for message events sent to webhook
 ///
-/// Wraps the original Discord Message with additional metadata
+/// Wraps the original Discord Message with additional channel metadata from cache
 #[derive(Serialize)]
 pub struct MessagePayload<'a> {
     /// The original Discord message
     #[serde(flatten)]
     pub message: &'a Message,
 
-    /// Whether the message was sent in a thread channel
+    /// Guild channel information (if available from cache)
     ///
-    /// - `true`: Message is in a thread (Public/Private/News)
-    /// - `false`: Message is in a regular channel or DM
-    /// - `None`: Thread detection was not performed (e.g., DM without guild_id)
+    /// Contains full channel details including:
+    /// - `kind`: Channel type (Text, Voice, PublicThread, PrivateThread, etc.)
+    /// - `name`: Channel name
+    /// - `parent_id`: Parent channel or category ID
+    /// - `topic`: Channel topic/description
+    /// - `thread_metadata`: Thread-specific metadata (if applicable)
+    /// - And many other fields
+    ///
+    /// This field is `None` for:
+    /// - Direct messages (no guild_id)
+    /// - Cache misses (channel not yet cached)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_thread: Option<bool>,
+    pub channel: Option<GuildChannel>,
 }
 
 impl<'a> MessagePayload<'a> {
-    /// Create a new MessagePayload without thread detection
+    /// Create a new MessagePayload without channel information
     pub fn new(message: &'a Message) -> Self {
         Self {
             message,
-            is_thread: None,
+            channel: None,
         }
     }
 
-    /// Create a new MessagePayload with thread detection result
-    pub fn with_thread_info(message: &'a Message, is_thread: bool) -> Self {
+    /// Create a new MessagePayload with channel information from cache
+    pub fn with_channel(message: &'a Message, channel: GuildChannel) -> Self {
         Self {
             message,
-            is_thread: Some(is_thread),
+            channel: Some(channel),
         }
     }
 }

@@ -3,7 +3,7 @@ mod bridge;
 mod params;
 
 use anyhow::Context as _;
-use adapters::{HttpEventSender, SerenityDiscordService};
+use adapters::{HttpEventSender, SerenityChannelInfoProvider, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
 use bridge::message_filter::MessageFilter;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler {
-    bridge: EventBridge<SerenityDiscordService, HttpEventSender>,
+    bridge: EventBridge<SerenityDiscordService, HttpEventSender, SerenityChannelInfoProvider>,
     params: Arc<params::Params>,
     // Active filters initialized in ready event
     message_direct_filter: std::sync::OnceLock<MessageFilter>,
@@ -25,6 +25,7 @@ struct Handler {
 impl Handler {
     fn new(params: &params::Params) -> anyhow::Result<Handler> {
         let discord_service = Arc::new(SerenityDiscordService);
+        let channel_info = Arc::new(SerenityChannelInfoProvider);
 
         let endpoint = url::Url::parse(&params.http_endpoint)
             .context("Parsing HTTP_ENDPOINT URL")?;
@@ -33,7 +34,7 @@ impl Handler {
             params.insecure_mode,
         )?);
 
-        let bridge = EventBridge::new(discord_service, event_sender);
+        let bridge = EventBridge::new(discord_service, event_sender, channel_info);
 
         Ok(Handler {
             bridge,
@@ -116,12 +117,12 @@ impl EventHandler for Handler {
         }
 
         // Handle event (send to webhook + execute actions)
-        match self.bridge.handle_message(&message).await {
+        match self.bridge.handle_message(&ctx.cache, &message).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Execute actions if webhook responded with any
                 if let Err(err) = self
                     .bridge
-                    .execute_actions(&ctx.http, &message, &event_response)
+                    .execute_actions(&ctx.cache, &ctx.http, &message, &event_response)
                     .await
                 {
                     error!(?err, "Failed to execute actions from webhook response");

@@ -1,6 +1,6 @@
 use super::discord_service::DiscordService;
 use serenity::async_trait;
-use serenity::model::channel::{AutoArchiveDuration, Channel, ChannelType, GuildChannel, Message};
+use serenity::model::channel::{AutoArchiveDuration, GuildChannel, Message};
 use serenity::model::id::{ChannelId, MessageId};
 
 /// Implementation for Discord operations via Serenity

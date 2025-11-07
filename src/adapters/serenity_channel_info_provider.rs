@@ -19,33 +19,31 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
     ) -> Result<bool, serenity::Error> {
         // Try cache first (fast path)
         // Extract channel kind from cache without holding the lock across await points
+        // Note: We need to iterate through all guilds to find the channel
         let cached_result: Option<bool> = {
-            // Get guild_id from channel cache
-            if let Some(guild_id) = cache.channel(channel_id).and_then(|c| c.guild_id) {
-                // Get channel from guild cache
-                if let Some(guild) = cache.guild(guild_id) {
-                    if let Some(channel) = guild.channels.get(&channel_id) {
-                        let is_thread = matches!(
-                            channel.kind,
-                            ChannelType::PublicThread
-                                | ChannelType::PrivateThread
-                                | ChannelType::NewsThread
-                        );
-                        debug!(
-                            channel_id = %channel_id,
-                            is_thread = is_thread,
-                            "Channel type resolved from cache"
-                        );
-                        Some(is_thread)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+            // Search all cached guilds for this channel
+            cache
+                .guilds()
+                .iter()
+                .find_map(|guild_ref| {
+                    guild_ref
+                        .channels
+                        .get(&channel_id)
+                        .map(|channel| {
+                            let is_thread = matches!(
+                                channel.kind,
+                                ChannelType::PublicThread
+                                    | ChannelType::PrivateThread
+                                    | ChannelType::NewsThread
+                            );
+                            debug!(
+                                channel_id = %channel_id,
+                                is_thread = is_thread,
+                                "Channel type resolved from cache"
+                            );
+                            is_thread
+                        })
+                })
         }; // Cache references are dropped here
 
         // Return cached result if available

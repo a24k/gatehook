@@ -3,7 +3,7 @@
 
 mod adapters;
 
-use adapters::{MockDiscordService, MockEventSender};
+use adapters::{MockChannelInfoProvider, MockDiscordService, MockEventSender};
 use gatehook::adapters::{ReactParams, ReplyParams, ThreadParams};
 use gatehook::bridge::event_bridge::EventBridge;
 use rstest::rstest;
@@ -46,8 +46,10 @@ async fn test_execute_actions_reply(
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
+    let cache = serenity::cache::Cache::default();
     let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Test message", 111, 222);
 
@@ -60,7 +62,7 @@ async fn test_execute_actions_reply(
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&cache, &http, &message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
