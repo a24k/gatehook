@@ -39,7 +39,6 @@ pub struct RecordedMessage {
     pub channel_id: ChannelId,
     pub content: String,
     pub reply_to: Option<MessageId>,
-    pub mention: bool,
 }
 
 impl Default for MockDiscordService {
@@ -125,7 +124,6 @@ impl DiscordService for MockDiscordService {
             channel_id,
             content: content.to_string(),
             reply_to: None,
-            mention: false,
         });
 
         // Return a dummy Message
@@ -152,7 +150,6 @@ impl DiscordService for MockDiscordService {
             channel_id,
             content: content.to_string(),
             reply_to: Some(message_id),
-            mention,
         });
 
         // Return a dummy Message

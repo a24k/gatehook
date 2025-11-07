@@ -66,7 +66,7 @@ External service abstractions and implementations:
   - `ResponseAction` enum: Represents Discord operations
     - `Reply { content, mention }`: Reply to message with optional mention
     - `React { emoji }`: Add reaction (Unicode or custom emoji "name:id")
-    - `Thread { name, auto_archive_duration, reply }`: Create thread with optional initial reply
+    - `Thread { name, content, auto_archive_duration }`: Create thread or send message to existing thread
   - Deserialized from webhook's JSON response using `#[serde(tag = "type")]`
 
 ### Bridge Layer (`src/bridge/`)
@@ -79,7 +79,9 @@ Business logic that orchestrates adapters:
     - `execute_actions()`: Iterates through actions, logs errors, continues on failure
     - `execute_reply()`: Handles reply action with 2000 char truncation
     - `execute_react()`: Handles reaction action (Unicode/custom emoji parsing)
-    - `execute_thread()`: Creates threads with auto-naming, detects existing threads
+    - `execute_thread()`: Creates threads with auto-naming, or sends message to existing thread
+      - Auto-generates thread name from message if not specified
+      - Detects if already in thread (skips creation, sends message instead)
   - Fully testable with mocks
 
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
@@ -123,7 +125,7 @@ Entry point that wires everything together:
 - `ResponseAction` enum: Tagged union of Discord operations
   - `Reply { content, mention }`: Reply to message with optional mention
   - `React { emoji }`: Add reaction (Unicode or custom emoji "name:id")
-  - `Thread { name, auto_archive_duration, reply }`: Create thread with optional initial reply
+  - `Thread { name, content, auto_archive_duration }`: Create thread or send message to existing thread
     - auto_archive_duration: 60, 1440, 4320, 10080 (minutes)
 - Uses serde with `#[serde(tag = "type")]` for type-safe deserialization
 - Comprehensive tests with rstest for all action types and edge cases
@@ -137,9 +139,9 @@ Entry point that wires everything together:
   - Error isolation (one failure doesn't stop others)
   - `execute_reply()`: Reply with content truncation (2000 chars)
   - `execute_react()`: Add reactions (Unicode/custom emoji)
-  - `execute_thread()`: Create threads or send to existing thread
+  - `execute_thread()`: Create threads or send message to existing thread
     - Auto-generates thread name from message if not specified
-    - Detects if already in thread (skips creation, sends reply instead)
+    - Detects if already in thread (skips creation, sends message instead)
 
 ### `bridge/message_filter/`
 Modular message filtering with 2-phase initialization:

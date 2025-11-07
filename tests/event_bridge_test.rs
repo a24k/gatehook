@@ -235,8 +235,6 @@ async fn test_execute_actions_thread_create_new() {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Discussion".to_string()),
             content: "Let's discuss".to_string(),
-            reply: false,
-            mention: false,
             auto_archive_duration: 1440,
         })],
     };
@@ -278,8 +276,6 @@ async fn test_execute_actions_thread_auto_name() {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: None,
             content: "Response".to_string(),
-            reply: false,
-            mention: false,
             auto_archive_duration: 1440,
         })],
     };
@@ -314,8 +310,6 @@ async fn test_execute_actions_thread_long_name() {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some(long_name),
             content: "Response".to_string(),
-            reply: false,
-            mention: false,
             auto_archive_duration: 1440,
         })],
     };
@@ -351,8 +345,6 @@ async fn test_execute_actions_thread_already_in_thread() {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Ignored".to_string()),
             content: "Reply in thread".to_string(),
-            reply: false,
-            mention: false,
             auto_archive_duration: 1440,
         })],
     };
@@ -373,7 +365,7 @@ async fn test_execute_actions_thread_already_in_thread() {
 }
 
 #[tokio::test]
-async fn test_execute_actions_thread_with_reply_in_new_thread() {
+async fn test_execute_actions_thread_create_with_custom_duration() {
     use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
@@ -385,13 +377,11 @@ async fn test_execute_actions_thread_with_reply_in_new_thread() {
     let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Original", 111, 222, 333);
 
-    // Thread action with reply=true (should be ignored for new threads)
+    // Thread action with custom auto_archive_duration
     let event_response = EventResponse {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Support".to_string()),
             content: "Help needed".to_string(),
-            reply: true,
-            mention: true,
             auto_archive_duration: 60,
         })],
     };
@@ -404,57 +394,16 @@ async fn test_execute_actions_thread_with_reply_in_new_thread() {
 
     let threads = discord_service.get_threads();
     assert_eq!(threads.len(), 1);
+    assert_eq!(threads[0].name, "Support");
+    assert_eq!(threads[0].auto_archive_duration, 60);
 
     let messages = discord_service.get_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].content, "Help needed");
     assert_eq!(messages[0].channel_id, ChannelId::new(222));
-    // When creating a new thread, reply is ignored (can't reply to parent message)
     assert_eq!(messages[0].reply_to, None);
-    assert!(!messages[0].mention);
 }
 
-#[tokio::test]
-async fn test_execute_actions_thread_with_reply_in_existing_thread() {
-    use gatehook::adapters::{EventResponse, ResponseAction};
-
-    // Setup
-    let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(true); // Already IN a thread
-    let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
-
-    let http = serenity::http::Http::new("dummy_token");
-    let message = create_guild_message("Thread message", 111, 222, 333);
-
-    // Thread action with reply=true (should work in existing thread)
-    let event_response = EventResponse {
-        actions: vec![ResponseAction::Thread(ThreadParams {
-            name: Some("Ignored".to_string()),
-            content: "Reply in thread".to_string(),
-            reply: true,
-            mention: true,
-            auto_archive_duration: 1440,
-        })],
-    };
-
-    // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
-
-    // Verify
-    assert!(result.is_ok());
-
-    let threads = discord_service.get_threads();
-    assert_eq!(threads.len(), 0, "Should NOT create new thread");
-
-    let messages = discord_service.get_messages();
-    assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].content, "Reply in thread");
-    assert_eq!(messages[0].channel_id, ChannelId::new(222));
-    // When already in thread, reply should work
-    assert_eq!(messages[0].reply_to, Some(MessageId::new(111)));
-    assert!(messages[0].mention);
-}
 
 #[tokio::test]
 async fn test_execute_actions_thread_in_dm_fails() {
@@ -473,8 +422,6 @@ async fn test_execute_actions_thread_in_dm_fails() {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Thread".to_string()),
             content: "Content".to_string(),
-            reply: false,
-            mention: false,
             auto_archive_duration: 1440,
         })],
     };
@@ -516,8 +463,6 @@ async fn test_execute_actions_mixed_types() {
             ResponseAction::Thread(ThreadParams {
                 name: Some("Discussion".to_string()),
                 content: "Thread content".to_string(),
-                reply: false,
-                mention: false,
                 auto_archive_duration: 1440,
             }),
         ],
