@@ -373,19 +373,19 @@ async fn test_execute_actions_thread_already_in_thread() {
 }
 
 #[tokio::test]
-async fn test_execute_actions_thread_with_reply() {
+async fn test_execute_actions_thread_with_reply_in_new_thread() {
     use gatehook::adapters::{EventResponse, ResponseAction};
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false);
+    discord_service.set_is_thread(false); // Creating NEW thread
     let event_sender = Arc::new(MockEventSender::new());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
 
     let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Original", 111, 222, 333);
 
-    // Thread action with reply
+    // Thread action with reply=true (should be ignored for new threads)
     let event_response = EventResponse {
         actions: vec![ResponseAction::Thread(ThreadParams {
             name: Some("Support".to_string()),
@@ -409,6 +409,49 @@ async fn test_execute_actions_thread_with_reply() {
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].content, "Help needed");
     assert_eq!(messages[0].channel_id, ChannelId::new(222));
+    // When creating a new thread, reply is ignored (can't reply to parent message)
+    assert_eq!(messages[0].reply_to, None);
+    assert!(!messages[0].mention);
+}
+
+#[tokio::test]
+async fn test_execute_actions_thread_with_reply_in_existing_thread() {
+    use gatehook::adapters::{EventResponse, ResponseAction};
+
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    discord_service.set_is_thread(true); // Already IN a thread
+    let event_sender = Arc::new(MockEventSender::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+
+    let http = serenity::http::Http::new("dummy_token");
+    let message = create_guild_message("Thread message", 111, 222, 333);
+
+    // Thread action with reply=true (should work in existing thread)
+    let event_response = EventResponse {
+        actions: vec![ResponseAction::Thread(ThreadParams {
+            name: Some("Ignored".to_string()),
+            content: "Reply in thread".to_string(),
+            reply: true,
+            mention: true,
+            auto_archive_duration: 1440,
+        })],
+    };
+
+    // Execute
+    let result = bridge.execute_actions(&http, &message, &event_response).await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    let threads = discord_service.get_threads();
+    assert_eq!(threads.len(), 0, "Should NOT create new thread");
+
+    let messages = discord_service.get_messages();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].content, "Reply in thread");
+    assert_eq!(messages[0].channel_id, ChannelId::new(222));
+    // When already in thread, reply should work
     assert_eq!(messages[0].reply_to, Some(MessageId::new(111)));
     assert!(messages[0].mention);
 }

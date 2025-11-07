@@ -245,7 +245,10 @@ where
         let content = truncate_content(&params.content);
 
         // Post message
-        if params.reply {
+        // Note: When creating a new thread, we can't reply to the parent message
+        // because it doesn't exist in the thread context. Only use reply when
+        // already in a thread.
+        if is_in_thread && params.reply {
             self.discord_service
                 .reply_in_channel(http, target_channel_id, message.id, &content, params.mention)
                 .await
