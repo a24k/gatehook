@@ -101,18 +101,14 @@ impl EventSender for HttpEventSender {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_http_event_sender_creation() {
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_http_event_sender_creation(#[case] insecure_mode: bool) {
         let url = Url::parse("https://example.com/webhook").unwrap();
-        let sender = HttpEventSender::new(url, false);
-        assert!(sender.is_ok());
-    }
-
-    #[test]
-    fn test_http_event_sender_creation_insecure() {
-        let url = Url::parse("https://example.com/webhook").unwrap();
-        let sender = HttpEventSender::new(url, true);
+        let sender = HttpEventSender::new(url, insecure_mode);
         assert!(sender.is_ok());
     }
 

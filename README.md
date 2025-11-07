@@ -214,6 +214,101 @@ Reply to the message that triggered the event.
 }
 ```
 
+#### `react` - Add Reaction
+
+Add a reaction emoji to the message that triggered the event.
+
+**Available in:** `message` handler only
+
+```json
+{
+  "type": "react",
+  "emoji": "👍"
+}
+```
+
+**Parameters:**
+- `emoji` (string, required): Emoji to react with
+  - **Unicode emoji**: Use the emoji directly (e.g., `"👍"`, `"❤️"`, `"🎉"`)
+  - **Custom emoji**: Use format `"name:id"` (e.g., `"customemoji:123456789012345678"`)
+
+**Examples:**
+
+```json
+// Unicode emoji
+{
+  "type": "react",
+  "emoji": "✅"
+}
+
+// Custom server emoji
+{
+  "type": "react",
+  "emoji": "mycustomemoji:987654321098765432"
+}
+```
+
+#### `thread` - Create Thread
+
+Create a thread from the message that triggered the event (or send a reply if already in a thread).
+
+**Available in:** `message` handler in guild channels only (not DMs)
+
+```json
+{
+  "type": "thread",
+  "name": "Discussion Topic",
+  "auto_archive_duration": 1440,
+  "reply": {
+    "content": "Let's discuss this here!",
+    "mention": false
+  }
+}
+```
+
+**Parameters:**
+- `name` (string, optional): Thread name (max 100 Unicode codepoints, auto-truncated if exceeded)
+  - If omitted, auto-generated from first line of message
+  - If message is empty, defaults to "Thread"
+- `auto_archive_duration` (integer, optional, default: `1440`): Minutes until thread auto-archives
+  - Valid values: `60` (1 hour), `1440` (1 day), `4320` (3 days), `10080` (1 week)
+  - Invalid values default to `1440` with warning log
+- `reply` (object, optional): Optional reply to send in the thread
+  - `content` (string, required): Reply text (max 2000 chars)
+  - `mention` (boolean, optional, default: `false`): Whether to mention the author
+
+**Behavior:**
+- **Normal channel**: Creates a new thread from the message
+- **Already in thread**: Skips thread creation, sends reply to existing thread
+- **DM channel**: Fails with error (threads not supported in DMs)
+
+**Examples:**
+
+```json
+// Create thread with auto-generated name
+{
+  "type": "thread",
+  "auto_archive_duration": 1440
+}
+
+// Create thread with custom name and reply
+{
+  "type": "thread",
+  "name": "Bug Report #1234",
+  "auto_archive_duration": 10080,
+  "reply": {
+    "content": "Thanks for reporting! Let's track this here.",
+    "mention": true
+  }
+}
+
+// Create thread with minimal config
+{
+  "type": "thread",
+  "name": "Quick Discussion"
+}
+```
+
 ### Multiple Actions
 
 Execute multiple actions in sequence:
@@ -222,18 +317,27 @@ Execute multiple actions in sequence:
 {
   "actions": [
     {
+      "type": "react",
+      "emoji": "👀"
+    },
+    {
       "type": "reply",
       "content": "Processing your request...",
       "mention": false
     },
     {
-      "type": "reply",
-      "content": "Done! ✓",
-      "mention": true
+      "type": "thread",
+      "name": "Request Processing",
+      "reply": {
+        "content": "Tracking progress here!",
+        "mention": false
+      }
     }
   ]
 }
 ```
+
+**Note:** Actions are executed sequentially in the order specified. If one action fails, remaining actions continue.
 
 ### Error Handling
 

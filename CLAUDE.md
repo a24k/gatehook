@@ -26,6 +26,7 @@ src/
 │   └── mod.rs
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic + action execution
+    ├── discord_text.rs     # Discord text utilities (truncation, thread name generation)
     ├── message_filter/     # Message filtering by sender type
     │   ├── mod.rs              # Public API re-exports
     │   ├── policy.rs           # MessageFilterPolicy (startup parsing)
@@ -50,7 +51,9 @@ The project follows a **layered architecture** with clear separation of concerns
 External service abstractions and implementations:
 
 - **`DiscordService` trait**: Abstracts Discord operations
+  - Methods: `react_to_message`, `create_thread_from_message`, `send_message_to_channel`, `reply_in_channel`, `is_thread_channel`
   - `SerenityDiscordService`: Production implementation using serenity
+    - Handles Discord API type conversions (e.g., u16 → AutoArchiveDuration)
   - `MockDiscordService` (tests): Records calls for verification
 
 - **`EventSender` trait**: Abstracts event forwarding
@@ -60,8 +63,11 @@ External service abstractions and implementations:
 
 - **`EventResponse` and `ResponseAction` types**: Webhook response structure
   - `EventResponse`: Container for action list from webhook
-  - `ResponseAction` enum: Represents Discord operations (Reply, React, etc.)
-  - Deserialized from webhook's JSON response
+  - `ResponseAction` enum: Represents Discord operations
+    - `Reply { content, mention }`: Reply to message with optional mention
+    - `React { emoji }`: Add reaction (Unicode or custom emoji "name:id")
+    - `Thread { name, auto_archive_duration, reply }`: Create thread with optional initial reply
+  - Deserialized from webhook's JSON response using `#[serde(tag = "type")]`
 
 ### Bridge Layer (`src/bridge/`)
 Business logic that orchestrates adapters:
@@ -72,6 +78,8 @@ Business logic that orchestrates adapters:
   - **Action execution**: Processes webhook response actions
     - `execute_actions()`: Iterates through actions, logs errors, continues on failure
     - `execute_reply()`: Handles reply action with 2000 char truncation
+    - `execute_react()`: Handles reaction action (Unicode/custom emoji parsing)
+    - `execute_thread()`: Creates threads with auto-naming, detects existing threads
   - Fully testable with mocks
 
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
@@ -113,9 +121,12 @@ Entry point that wires everything together:
 ### `adapters/event_response.rs`
 - `EventResponse`: Webhook response container with `actions: Vec<ResponseAction>`
 - `ResponseAction` enum: Tagged union of Discord operations
-  - `Reply { content: String, mention: bool }`: Reply to message
-  - Future: React, CreateThread, SendToChannel, etc.
+  - `Reply { content, mention }`: Reply to message with optional mention
+  - `React { emoji }`: Add reaction (Unicode or custom emoji "name:id")
+  - `Thread { name, auto_archive_duration, reply }`: Create thread with optional initial reply
+    - auto_archive_duration: 60, 1440, 4320, 10080 (minutes)
 - Uses serde with `#[serde(tag = "type")]` for type-safe deserialization
+- Comprehensive tests with rstest for all action types and edge cases
 
 ### `bridge/event_bridge.rs`
 - `EventBridge`: Core business logic
@@ -124,7 +135,11 @@ Entry point that wires everything together:
 - **Action execution**:
   - Sequential processing of actions (preserves order)
   - Error isolation (one failure doesn't stop others)
-  - Content truncation (2000 char limit for Discord messages)
+  - `execute_reply()`: Reply with content truncation (2000 chars)
+  - `execute_react()`: Add reactions (Unicode/custom emoji)
+  - `execute_thread()`: Create threads or send to existing thread
+    - Auto-generates thread name from message if not specified
+    - Detects if already in thread (skips creation, sends reply instead)
 
 ### `bridge/message_filter/`
 Modular message filtering with 2-phase initialization:
@@ -155,6 +170,25 @@ Modular message filtering with 2-phase initialization:
 **`tests.rs` - Test Helpers**
 - `MockMessage`: Shared test helper with builder pattern
 - Used by tests in both `policy.rs` and `filter.rs`
+
+### `bridge/discord_text.rs`
+Discord text processing utilities for API length limitations:
+
+- `truncate_content(content: &str) -> String`: Truncates to 2000 chars (Discord message limit)
+  - Adds "..." suffix when truncated
+  - Counts Unicode characters (not bytes) for multibyte safety
+  - Logs warning with original and truncated lengths
+
+- `generate_thread_name(message: &Message) -> String`: Auto-generates thread name from message
+  - Uses first line of message content (trimmed)
+  - Falls back to "Thread" if content is empty
+  - Truncates to 100 chars maximum
+
+- `truncate_thread_name(name: &str) -> String`: Truncates to 100 chars (Discord thread name limit)
+  - Counts Unicode characters (not bytes)
+  - No suffix added (preserves user input)
+
+- Comprehensive tests: 18 unit tests covering edge cases, Unicode handling, boundary conditions
 
 ## Development Workflow
 
@@ -189,11 +223,13 @@ All checks must pass before committing.
 ```
 tests/
 ├── adapters/
-│   ├── mock_discord.rs      # MockDiscordService with RecordedReply
+│   ├── mock_discord.rs      # MockDiscordService with RecordedReply/RecordedReaction/RecordedThread
 │   ├── mock_event_sender.rs # MockEventSender with SentEvent
 │   └── mod.rs               # Public exports
-└── event_bridge_test.rs     # EventBridge logic tests
+└── event_bridge_test.rs     # EventBridge logic tests (Reply/React/Thread actions)
 
+src/adapters/event_response.rs  # Contains #[cfg(test)] mod tests (18 tests)
+src/bridge/discord_text.rs      # Contains #[cfg(test)] mod tests (18 tests)
 src/bridge/message_filter/
 ├── policy.rs                # Contains #[cfg(test)] mod tests
 ├── filter.rs                # Contains #[cfg(test)] mod tests
@@ -228,6 +264,8 @@ src/bridge/message_filter/
 10. **Dynamic Gateway Intents**: Only request permissions for enabled events
 11. **Trait abstraction for testing**: FilterableMessage enables testing without serenity Message
 12. **Colocated tests**: Unit tests in same file as implementation using `#[cfg(test)]`
+13. **Adapter layer type conversion**: Discord API-specific types (e.g., AutoArchiveDuration) converted in adapter layer, not business logic
+14. **Utility module extraction**: Discord API constraints (text limits) separated into dedicated module (discord_text)
 
 ### Future Growth Path
 When complexity increases:
