@@ -173,9 +173,13 @@ async fn test_handle_message_with_webhook_response() {
     let response = response.unwrap();
     assert_eq!(response.actions.len(), 1);
 
-    // Event was sent
+    // Event was sent to webhook
     let sent_events = event_sender.get_sent_events();
-    assert_eq!(sent_events.len(), 1);
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(
+        sent_events[0].handler, "message",
+        "Event handler should be 'message'"
+    );
 }
 
 #[rstest]
