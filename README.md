@@ -258,11 +258,10 @@ Create a thread from the message that triggered the event (or send a reply if al
 {
   "type": "thread",
   "name": "Discussion Topic",
-  "auto_archive_duration": 1440,
-  "reply": {
-    "content": "Let's discuss this here!",
-    "mention": false
-  }
+  "content": "Let's discuss this here!",
+  "reply": true,
+  "mention": false,
+  "auto_archive_duration": 1440
 }
 ```
 
@@ -270,12 +269,12 @@ Create a thread from the message that triggered the event (or send a reply if al
 - `name` (string, optional): Thread name (max 100 Unicode codepoints, auto-truncated if exceeded)
   - If omitted, auto-generated from first line of message
   - If message is empty, defaults to "Thread"
+- `content` (string, required): Message content to send in the thread (max 2000 Unicode codepoints, auto-truncated if exceeded)
+- `reply` (boolean, optional, default: `false`): Whether to post the content as a reply to the original message
+- `mention` (boolean, optional, default: `false`): Whether to mention the author when replying (only used when `reply` is `true`)
 - `auto_archive_duration` (integer, optional, default: `1440`): Minutes until thread auto-archives
   - Valid values: `60` (1 hour), `1440` (1 day), `4320` (3 days), `10080` (1 week)
   - Invalid values default to `1440` with warning log
-- `reply` (object, optional): Optional reply to send in the thread
-  - `content` (string, required): Reply text (max 2000 chars)
-  - `mention` (boolean, optional, default: `false`): Whether to mention the author
 
 **Behavior:**
 - **Normal channel**: Creates a new thread from the message
@@ -288,24 +287,24 @@ Create a thread from the message that triggered the event (or send a reply if al
 // Create thread with auto-generated name
 {
   "type": "thread",
-  "auto_archive_duration": 1440
+  "content": "Starting a discussion about this topic"
 }
 
-// Create thread with custom name and reply
+// Create thread with custom name and reply with mention
 {
   "type": "thread",
   "name": "Bug Report #1234",
-  "auto_archive_duration": 10080,
-  "reply": {
-    "content": "Thanks for reporting! Let's track this here.",
-    "mention": true
-  }
+  "content": "Thanks for reporting! Let's track this here.",
+  "reply": true,
+  "mention": true,
+  "auto_archive_duration": 10080
 }
 
-// Create thread with minimal config
+// Create thread with minimal config (name auto-generated, no reply)
 {
   "type": "thread",
-  "name": "Quick Discussion"
+  "name": "Quick Discussion",
+  "content": "Let's talk about this"
 }
 ```
 
@@ -328,10 +327,9 @@ Execute multiple actions in sequence:
     {
       "type": "thread",
       "name": "Request Processing",
-      "reply": {
-        "content": "Tracking progress here!",
-        "mention": false
-      }
+      "content": "Tracking progress here!",
+      "reply": true,
+      "mention": false
     }
   ]
 }
