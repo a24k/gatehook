@@ -256,12 +256,12 @@ where
         params: &ThreadParams,
     ) -> anyhow::Result<()> {
         // Ensure we're in a guild (threads not supported in DM)
-        message.guild_id
+        let guild_id = message.guild_id
             .context("Thread action is not supported in DM")?;
 
         // Check if already in thread (cache-first with API fallback)
         let is_in_thread = self.channel_info
-            .is_thread_channel(cache, http, message.channel_id)
+            .is_thread(cache, http, Some(guild_id), message.channel_id)
             .await
             .context("Failed to check if channel is thread")?;
 
