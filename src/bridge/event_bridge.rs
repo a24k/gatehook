@@ -244,32 +244,17 @@ where
         // Truncate content
         let content = truncate_content(&params.content);
 
-        // Post message
-        if params.reply {
-            self.discord_service
-                .reply_in_channel(http, target_channel_id, message.id, &content, params.mention)
-                .await
-                .context("Failed to send reply in thread")?;
+        // Post message to thread
+        self.discord_service
+            .send_message_to_channel(http, target_channel_id, &content)
+            .await
+            .context("Failed to send message to thread")?;
 
-            info!(
-                channel_id = %target_channel_id,
-                message_id = %message.id,
-                reply = true,
-                mention = params.mention,
-                "Successfully executed thread action with reply"
-            );
-        } else {
-            self.discord_service
-                .send_message_to_channel(http, target_channel_id, &content)
-                .await
-                .context("Failed to send message to thread")?;
-
-            info!(
-                channel_id = %target_channel_id,
-                reply = false,
-                "Successfully executed thread action"
-            );
-        }
+        info!(
+            channel_id = %target_channel_id,
+            is_in_thread = is_in_thread,
+            "Successfully executed thread action"
+        );
 
         Ok(())
     }

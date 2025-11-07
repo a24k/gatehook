@@ -42,12 +42,6 @@ pub struct ThreadParams {
     pub name: Option<String>,
     /// Message content (any length accepted, truncated at execution if needed)
     pub content: String,
-    /// Whether to post as a reply (default: false)
-    #[serde(default)]
-    pub reply: bool,
-    /// Whether to mention when replying (default: false)
-    #[serde(default)]
-    pub mention: bool,
     /// Auto-archive duration in minutes (default: 1440)
     ///
     /// Valid values: 60, 1440, 4320, 10080
@@ -170,40 +164,24 @@ mod tests {
         r#"{"actions":[{"type":"thread","name":"Discussion","content":"Let's talk"}]}"#,
         Some("Discussion"),
         "Let's talk",
-        false,
-        false,
         1440
     )]
     #[case::without_name(
         r#"{"actions":[{"type":"thread","content":"Message"}]}"#,
         None,
         "Message",
-        false,
-        false,
-        1440
-    )]
-    #[case::with_reply(
-        r#"{"actions":[{"type":"thread","name":"Support","content":"Help needed","reply":true,"mention":true}]}"#,
-        Some("Support"),
-        "Help needed",
-        true,
-        true,
         1440
     )]
     #[case::custom_auto_archive(
         r#"{"actions":[{"type":"thread","content":"Test","auto_archive_duration":60}]}"#,
         None,
         "Test",
-        false,
-        false,
         60
     )]
     fn test_parse_thread_action(
         #[case] json: &str,
         #[case] expected_name: Option<&str>,
         #[case] expected_content: &str,
-        #[case] expected_reply: bool,
-        #[case] expected_mention: bool,
         #[case] expected_auto_archive: u16,
     ) {
         let response: EventResponse = serde_json::from_str(json).unwrap();
@@ -213,8 +191,6 @@ mod tests {
             ResponseAction::Thread(params) => {
                 assert_eq!(params.name.as_deref(), expected_name);
                 assert_eq!(params.content, expected_content);
-                assert_eq!(params.reply, expected_reply);
-                assert_eq!(params.mention, expected_mention);
                 assert_eq!(params.auto_archive_duration, expected_auto_archive);
             }
             _ => panic!("Expected Thread action"),
