@@ -87,26 +87,15 @@ impl Params {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_mask_token_long_string() {
-        let token = "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5";
-        let masked = mask_token(token);
-        assert_eq!(masked, "MTEx***OTk5");
-    }
-
-    #[test]
-    fn test_mask_token_short_string() {
-        let token = "short";
-        let masked = mask_token(token);
-        assert_eq!(masked, "s***");
-    }
-
-    #[test]
-    fn test_mask_token_empty_string() {
-        let token = "";
-        let masked = mask_token(token);
-        assert_eq!(masked, "<empty>");
+    #[rstest]
+    #[case::long_string("MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5", "MTEx***OTk5")]
+    #[case::short_string("short", "s***")]
+    #[case::empty_string("", "<empty>")]
+    fn test_mask_token(#[case] input: &str, #[case] expected: &str) {
+        let masked = mask_token(input);
+        assert_eq!(masked, expected);
     }
 
     #[test]

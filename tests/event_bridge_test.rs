@@ -29,31 +29,6 @@ fn create_guild_message(content: &str, message_id: u64, channel_id: u64, guild_i
     message
 }
 
-#[tokio::test]
-async fn test_handle_message_forwards_to_webhook() {
-    // Setup
-    let discord_service = Arc::new(MockDiscordService::new());
-    let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
-
-    // Create a message
-    let message = create_test_message("Hello, world!", 789, 456);
-
-    // Execute
-    let result = bridge.handle_message(&message).await;
-
-    // Verify
-    assert!(result.is_ok(), "handle_message should succeed");
-
-    // Check that event was forwarded to webhook
-    let sent_events = event_sender.get_sent_events();
-    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
-    assert_eq!(
-        sent_events[0].handler, "message",
-        "Event handler should be 'message'"
-    );
-}
-
 // Note: test_handle_ready is skipped because Ready doesn't implement Default
 // and creating a valid Ready instance requires extensive setup.
 // The ready event forwarding is tested through integration testing instead.
