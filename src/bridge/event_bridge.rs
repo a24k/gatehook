@@ -147,18 +147,16 @@ where
     ///
     /// # Arguments
     ///
-    /// * `http` - The HTTP client for Discord API calls
     /// * `message` - The message that triggered the event (for context)
     /// * `event_response` - The response from webhook containing actions
     pub async fn execute_actions(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         event_response: &EventResponse,
     ) -> anyhow::Result<()> {
         for action in &event_response.actions {
             // Execute action (log error and continue with next)
-            if let Err(err) = self.execute_action(http, message, action).await {
+            if let Err(err) = self.execute_action(message, action).await {
                 error!(?err, ?action, "Failed to execute action, continuing with next");
             }
         }
@@ -168,14 +166,13 @@ where
     /// Execute a single action
     async fn execute_action(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         action: &ResponseAction,
     ) -> anyhow::Result<()> {
         match action {
-            ResponseAction::Reply(params) => self.execute_reply(http, message, params).await,
-            ResponseAction::React(params) => self.execute_react(http, message, params).await,
-            ResponseAction::Thread(params) => self.execute_thread(http, message, params).await,
+            ResponseAction::Reply(params) => self.execute_reply(message, params).await,
+            ResponseAction::React(params) => self.execute_react(message, params).await,
+            ResponseAction::Thread(params) => self.execute_thread(message, params).await,
         }
     }
 
@@ -189,14 +186,13 @@ where
     /// - `params.mention = false`: Reply without ping (default)
     async fn execute_reply(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ReplyParams,
     ) -> anyhow::Result<()> {
         let content = truncate_content(&params.content);
 
         self.discord_service
-            .reply_in_channel(http, message.channel_id, message.id, &content, params.mention)
+            .reply_in_channel(message.channel_id, message.id, &content, params.mention)
             .await
             .context("Failed to send reply to Discord")?;
 
@@ -217,12 +213,11 @@ where
     /// - Custom emoji: "name:id" format (e.g., "customemoji:123456789")
     async fn execute_react(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ReactParams,
     ) -> anyhow::Result<()> {
         self.discord_service
-            .react_to_message(http, message.channel_id, message.id, &params.emoji)
+            .react_to_message(message.channel_id, message.id, &params.emoji)
             .await
             .context("Failed to add reaction to Discord")?;
 
@@ -251,7 +246,6 @@ where
     /// - Invalid values fall back to 1440 (OneDay) with warning log
     async fn execute_thread(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ThreadParams,
     ) -> anyhow::Result<()> {
@@ -280,7 +274,6 @@ where
             let thread = self
                 .discord_service
                 .create_thread_from_message(
-                    http,
                     message,
                     &thread_name,
                     params.auto_archive_duration,
@@ -301,7 +294,7 @@ where
 
         // Post message to thread
         self.discord_service
-            .send_message_to_channel(http, target_channel_id, &content)
+            .send_message_to_channel(target_channel_id, &content)
             .await
             .context("Failed to send message to thread")?;
 

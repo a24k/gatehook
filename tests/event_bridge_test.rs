@@ -61,7 +61,7 @@ async fn test_execute_actions_reply(
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -102,7 +102,7 @@ async fn test_execute_actions_multiple_replies() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -138,7 +138,7 @@ async fn test_execute_actions_long_content_truncated() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -211,7 +211,7 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -247,7 +247,7 @@ async fn test_execute_actions_thread_create_new() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -289,7 +289,7 @@ async fn test_execute_actions_thread_auto_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -324,7 +324,7 @@ async fn test_execute_actions_thread_long_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -360,7 +360,7 @@ async fn test_execute_actions_thread_already_in_thread() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -398,7 +398,7 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -439,7 +439,7 @@ async fn test_execute_actions_thread_in_dm_fails() {
     };
 
     // Execute (should complete but log error)
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // execute_actions continues on error, so result is Ok
     assert!(result.is_ok());
@@ -482,7 +482,7 @@ async fn test_execute_actions_mixed_types() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());

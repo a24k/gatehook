@@ -77,7 +77,6 @@ impl MockDiscordService {
 impl DiscordService for MockDiscordService {
     async fn react_to_message(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         emoji: &str,
@@ -92,7 +91,6 @@ impl DiscordService for MockDiscordService {
 
     async fn create_thread_from_message(
         &self,
-        _http: &serenity::http::Http,
         message: &Message,
         name: &str,
         auto_archive_duration: u16,
@@ -110,7 +108,6 @@ impl DiscordService for MockDiscordService {
 
     async fn send_message_to_channel(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         content: &str,
     ) -> Result<Message, serenity::Error> {
@@ -126,7 +123,6 @@ impl DiscordService for MockDiscordService {
 
     async fn reply_in_channel(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,

@@ -40,7 +40,7 @@ impl EventHandler for Handler {
 
         // Initialize EventBridge with cache and http from Context
         // Both are kept alive and maintained by Serenity's event loop
-        let discord_service = Arc::new(SerenityDiscordService);
+        let discord_service = Arc::new(SerenityDiscordService::new(ctx.http.clone()));
         let channel_info = Arc::new(SerenityChannelInfoProvider::new(
             ctx.cache.clone(),
             ctx.http.clone()
@@ -139,7 +139,7 @@ impl EventHandler for Handler {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Execute actions if webhook responded with any
                 if let Err(err) = bridge
-                    .execute_actions(&ctx.http, &message, &event_response)
+                    .execute_actions(&message, &event_response)
                     .await
                 {
                     error!(?err, "Failed to execute actions from webhook response");
