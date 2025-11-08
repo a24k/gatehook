@@ -4,6 +4,7 @@ use crate::adapters::{
 };
 use crate::bridge::discord_text::{generate_thread_name, truncate_content, truncate_thread_name};
 use crate::bridge::message_payload::MessagePayload;
+use crate::bridge::ready_payload::ReadyPayload;
 use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -132,9 +133,12 @@ where
             "Processing ready event"
         );
 
+        // Build payload with ready event
+        let payload = ReadyPayload::new(ready);
+
         // Forward event to webhook endpoint and return response
         self.event_sender
-            .send("ready", ready)
+            .send("ready", &payload)
             .await
             .context("Failed to send ready event to HTTP endpoint")
     }

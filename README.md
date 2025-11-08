@@ -213,6 +213,53 @@ def is_in_thread(payload):
     return kind in ["PublicThread", "PrivateThread", "NewsThread"]
 ```
 
+### Ready Event Payload
+
+When the bot connects to Discord (if `READY` is enabled), a ready event is sent:
+
+```
+POST {HTTP_ENDPOINT}?handler=ready
+```
+
+The request body contains the ready data wrapped in a `ready` key:
+
+```json
+{
+  "ready": {
+    "v": 10,
+    "user": {
+      "id": "123456789012345678",
+      "username": "MyBot",
+      "discriminator": "0",
+      "avatar": "...",
+      "bot": true
+    },
+    "guilds": [
+      {
+        "id": "987654321098765432",
+        "unavailable": false
+      }
+    ],
+    "session_id": "...",
+    "resume_gateway_url": "...",
+    "shard": [0, 1],
+    "application": {
+      "id": "123456789012345678",
+      "flags": 0
+    }
+    // ... other Discord Ready fields ...
+  }
+}
+```
+
+**Ready event fields** (from Discord's [Ready](https://discord.com/developers/docs/topics/gateway-events#ready) event):
+- `v` - Gateway version
+- `user` - Bot user information
+- `guilds` - Guilds the bot is in (may be unavailable during initial connection)
+- `session_id` - Session ID for resuming
+- `shard` - Shard information (if sharding is used)
+- `application` - Application information
+
 ## Webhook Response Actions
 
 Your HTTP endpoint can respond with actions for gatehook to execute on Discord. This enables bidirectional communication - your webhook receives events and can instruct gatehook to reply, react, or perform other Discord operations.

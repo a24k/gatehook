@@ -29,6 +29,7 @@ src/
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic + action execution
     ├── message_payload.rs  # MessagePayload wrapper with GuildChannel metadata
+    ├── ready_payload.rs    # ReadyPayload wrapper for ready events
     ├── discord_text.rs     # Discord text utilities (truncation, thread name generation)
     ├── message_filter/     # Message filtering by sender type
     │   ├── mod.rs              # Public API re-exports
@@ -109,6 +110,12 @@ Business logic that orchestrates adapters:
   - `message` field contains all Discord Message fields
   - `channel` field omitted from JSON when None via `#[serde(skip_serializing_if)]`
 
+- **`ReadyPayload`**: Wrapper for ready event webhook payloads
+  - Wraps serenity's `Ready` event
+  - `new()`: Constructor that takes ready event reference
+  - JSON structure: `{ "ready": {...} }`
+  - Contains bot connection information (user, guilds, session_id, etc.)
+
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
   - **`MessageFilterPolicy`**: Parsed at startup from environment variables via serde
   - **`MessageFilter`**: Created in `ready` event with bot's user_id for runtime filtering
@@ -183,6 +190,15 @@ Entry point that wires everything together:
   - `with_channel(message, channel)` - For guild messages with channel metadata
 - Serde attributes:
   - `#[serde(skip_serializing_if = "Option::is_none")]` on channel: Clean JSON output
+
+### `bridge/ready_payload.rs`
+- `ReadyPayload<'a>`: Wrapper struct for ready event webhook payloads
+- Fields:
+  - `ready: &'a Ready` - Discord Ready event wrapped in "ready" key
+- JSON structure: `{ "ready": {...} }`
+- Constructor:
+  - `new(ready)` - Wraps ready event for webhook delivery
+- Contains bot connection info: user, guilds, session_id, shard info, etc.
 
 ### `bridge/event_bridge.rs`
 - `EventBridge`: Core business logic
