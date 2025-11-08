@@ -21,12 +21,14 @@ pub struct MessagePayload<'a> {
     /// Guild channel information (if available from cache)
     ///
     /// Contains full channel details including:
-    /// - `kind`: Channel type (Text, Voice, PublicThread, PrivateThread, etc.)
+    /// - `type`: Channel type as integer (0=Text, 2=Voice, 11=PublicThread, 12=PrivateThread, etc.)
     /// - `name`: Channel name
     /// - `parent_id`: Parent channel or category ID
     /// - `topic`: Channel topic/description
     /// - `thread_metadata`: Thread-specific metadata (if applicable)
     /// - And many other fields
+    ///
+    /// Note: The Rust field name is `kind`, but it serializes to JSON as `type`.
     ///
     /// This field is `None` for:
     /// - Direct messages (no guild_id)

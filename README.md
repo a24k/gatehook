@@ -168,7 +168,7 @@ The request body contains the message data wrapped in a `message` key, with opti
   "channel": {
     "id": "987654321098765432",
     "name": "general",
-    "kind": "Text",
+    "type": 0,
     "parent_id": null,
     "topic": "General discussion",
     "position": 0,
@@ -177,25 +177,25 @@ The request body contains the message data wrapped in a `message` key, with opti
 }
 ```
 
+**Note:** The `type` field is an integer representing the channel type. See [Discord's Channel Type documentation](https://discord.com/developers/docs/resources/channel#channel-object-channel-types) for the complete mapping.
+
 **The `channel` field:**
 - **Present:** For guild (server) messages when `MESSAGE_GUILD` is enabled
 - **Absent:** For direct messages, or if channel information is not available in cache
 
 **Detecting threads:**
-Check the `channel.kind` field:
-- `"PublicThread"` - Public thread
-- `"PrivateThread"` - Private thread
-- `"NewsThread"` - News/Announcement thread
-- `"Text"` - Regular text channel
-- `"Voice"` - Voice channel
-- Other types: `"Category"`, `"News"`, `"Stage"`, `"Forum"`, etc.
-
-**Note:** The `kind` field is serialized as an integer in the JSON payload. For the complete mapping of channel type names to numeric values, see [Discord's Channel Type documentation](https://discord.com/developers/docs/resources/channel#channel-object-channel-types).
+Check the `channel.type` field:
+- `11` - Public thread (`PUBLIC_THREAD`)
+- `12` - Private thread (`PRIVATE_THREAD`)
+- `10` - News/Announcement thread (`ANNOUNCEMENT_THREAD`)
+- `0` - Regular text channel (`GUILD_TEXT`)
+- `2` - Voice channel (`GUILD_VOICE`)
+- Other types: `4` (Category), `5` (News), `13` (Stage), `15` (Forum), etc.
 
 **Available channel fields** (from Discord's [GuildChannel](https://discord.com/developers/docs/resources/channel#channel-object)):
 - `id` - Channel ID
 - `name` - Channel name
-- `kind` - Channel type (see above)
+- `type` - Channel type (integer, see above)
 - `position` - Sorting position
 - `parent_id` - Parent category ID (null for top-level channels)
 - `topic` - Channel topic/description (if set)
@@ -211,8 +211,9 @@ def is_in_thread(payload):
     if not channel:
         return False  # DM or no channel info
 
-    kind = channel.get("kind")
-    return kind in ["PublicThread", "PrivateThread", "NewsThread"]
+    channel_type = channel.get("type")
+    # 10 = ANNOUNCEMENT_THREAD, 11 = PUBLIC_THREAD, 12 = PRIVATE_THREAD
+    return channel_type in [10, 11, 12]
 ```
 
 ### Ready Event Payload
