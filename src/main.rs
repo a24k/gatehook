@@ -108,7 +108,7 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn message(&self, ctx: Context, message: Message) {
+    async fn message(&self, _ctx: Context, message: Message) {
         let is_direct = message.guild_id.is_none();
 
         // Get the appropriate active filter
@@ -135,7 +135,7 @@ impl EventHandler for Handler {
         };
 
         // Handle event (send to webhook + execute actions)
-        match bridge.handle_message(&ctx.cache, &message).await {
+        match bridge.handle_message(&message).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Execute actions if webhook responded with any
                 if let Err(err) = bridge

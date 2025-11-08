@@ -163,10 +163,9 @@ async fn test_handle_message_with_webhook_response() {
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let message = create_test_message("Hello", 999, 1000);
-    let cache = serenity::cache::Cache::default();
 
     // Execute handle_message (which should return the EventResponse)
-    let result = bridge.handle_message(&cache, &message).await;
+    let result = bridge.handle_message(&message).await;
 
     // Verify
     assert!(result.is_ok());

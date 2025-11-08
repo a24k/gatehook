@@ -112,4 +112,83 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
 
         Ok(is_thread)
     }
+
+    async fn get_channel(
+        &self,
+        guild_id: Option<serenity::model::id::GuildId>,
+        channel_id: ChannelId,
+    ) -> Result<Option<serenity::model::channel::GuildChannel>, serenity::Error> {
+        // Try cache first (fast path)
+        // Extract channel from cache without holding the lock across await points
+        let cached_result: Option<serenity::model::channel::GuildChannel> = if let Some(gid) =
+            guild_id
+        {
+            // Direct guild access (O(1) - fast)
+            self.cache.guild(gid).and_then(|guild_ref| {
+                // Check regular channels first, then threads
+                guild_ref
+                    .channels
+                    .get(&channel_id)
+                    .cloned()
+                    .or_else(|| {
+                        guild_ref
+                            .threads
+                            .iter()
+                            .find(|ch| ch.id == channel_id)
+                            .cloned()
+                    })
+                    .inspect(|channel| {
+                        debug!(
+                            guild_id = %gid,
+                            channel_id = %channel_id,
+                            channel_name = %channel.name,
+                            "Channel retrieved from cache (direct guild access)"
+                        );
+                    })
+            })
+        } else {
+            // Search all guilds (O(n) - slower fallback)
+            self.cache.guilds().iter().find_map(|guild_id| {
+                self.cache.guild(*guild_id).and_then(|guild_ref| {
+                    // Check regular channels first, then threads
+                    guild_ref
+                        .channels
+                        .get(&channel_id)
+                        .cloned()
+                        .or_else(|| {
+                            guild_ref
+                                .threads
+                                .iter()
+                                .find(|ch| ch.id == channel_id)
+                                .cloned()
+                        })
+                        .inspect(|channel| {
+                            debug!(
+                                guild_id = %guild_id,
+                                channel_id = %channel_id,
+                                channel_name = %channel.name,
+                                "Channel retrieved from cache (guild search)"
+                            );
+                        })
+                })
+            })
+        }; // Cache references are dropped here
+
+        // Return cached result if available
+        if let Some(channel) = cached_result {
+            return Ok(Some(channel));
+        }
+
+        // Cache miss - fallback to API (slow path)
+        debug!(
+            channel_id = %channel_id,
+            "Cache miss, fetching channel from API"
+        );
+
+        let channel = self.http.get_channel(channel_id).await?;
+        match channel {
+            Channel::Guild(guild_channel) => Ok(Some(guild_channel)),
+            _ => Ok(None), // DM channel
+        }
+    }
 }
