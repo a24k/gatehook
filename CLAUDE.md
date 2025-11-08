@@ -105,7 +105,8 @@ Business logic that orchestrates adapters:
   - Combines serenity's `Message` with optional `GuildChannel`
   - `with_channel()`: Constructor for guild messages with channel info
   - `new()`: Constructor for DMs or cache misses (no channel field)
-  - Serialized with `#[serde(flatten)]` to merge Message fields at top level
+  - JSON structure: `{ "message": {...}, "channel": {...} }`
+  - `message` field contains all Discord Message fields
   - `channel` field omitted from JSON when None via `#[serde(skip_serializing_if)]`
 
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
@@ -174,13 +175,13 @@ Entry point that wires everything together:
 ### `bridge/message_payload.rs`
 - `MessagePayload<'a>`: Wrapper struct for webhook payloads
 - Fields:
-  - `message: &'a Message` - Flattened into top-level JSON
-  - `channel: Option<GuildChannel>` - Omitted from JSON when None
+  - `message: &'a Message` - Discord Message wrapped in "message" key
+  - `channel: Option<GuildChannel>` - Optional channel metadata, omitted when None
+- JSON structure: `{ "message": {...}, "channel": {...} }`
 - Constructors:
   - `new(message)` - For DMs or cache misses (no channel info)
   - `with_channel(message, channel)` - For guild messages with channel metadata
 - Serde attributes:
-  - `#[serde(flatten)]` on message: Merges all Message fields at JSON root
   - `#[serde(skip_serializing_if = "Option::is_none")]` on channel: Clean JSON output
 
 ### `bridge/event_bridge.rs`

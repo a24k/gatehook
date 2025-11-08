@@ -138,48 +138,44 @@ RUST_LOG=trace ./gatehook
 
 ## Event Forwarding Format
 
-Events are forwarded to your HTTP endpoint as JSON POST requests:
+Events are forwarded to your HTTP endpoint as JSON POST requests with the event type specified as a query parameter:
 
-```json
-{
-  "event_type": "message",
-  "payload": {
-    // Discord event data (serenity Message struct serialized)
-    // For message events, includes optional channel metadata (see below)
-  }
-}
+```
+POST {HTTP_ENDPOINT}?handler=message
 ```
 
-### Message Event Payload with Channel Information
+### Message Event Payload
 
-For `message` events in guilds, the payload includes a `channel` field with metadata about the channel:
+The request body contains the message data wrapped in a `message` key, with optional channel metadata:
 
 ```json
 {
-  "event_type": "message",
-  "payload": {
-    // All Discord Message fields (flattened to top level)
+  "message": {
     "id": "123456789012345678",
     "content": "Hello!",
-    "author": { ... },
+    "author": {
+      "id": "234567890123456789",
+      "username": "user123",
+      "discriminator": "0",
+      "avatar": "...",
+      "bot": false
+    },
     "timestamp": "2024-01-15T12:34:56.789Z",
     "channel_id": "987654321098765432",
-    // ... many other Message fields ...
-
-    // Additional channel metadata (when available)
-    "channel": {
-      "id": "987654321098765432",
-      "name": "general",
-      "kind": "Text",
-      "parent_id": null,
-      "topic": "General discussion",
-      // ... other GuildChannel fields ...
-    }
+    "guild_id": "876543210987654321",
+    // ... many other Discord Message fields ...
+  },
+  "channel": {
+    "id": "987654321098765432",
+    "name": "general",
+    "kind": "Text",
+    "parent_id": null,
+    "topic": "General discussion",
+    "position": 0,
+    // ... other GuildChannel fields ...
   }
 }
 ```
-
-**Note:** The `message` fields and `channel` field are at the same level (parallel) in the JSON structure.
 
 **The `channel` field:**
 - **Present:** For guild (server) messages when `MESSAGE_GUILD` is enabled

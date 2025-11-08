@@ -3,11 +3,19 @@ use serenity::model::channel::{GuildChannel, Message};
 
 /// Payload for message events sent to webhook
 ///
-/// Wraps the original Discord Message with additional channel metadata from cache
+/// Contains the original Discord Message wrapped in a `message` key,
+/// along with additional channel metadata from cache.
+///
+/// JSON structure:
+/// ```json
+/// {
+///   "message": { /* Discord Message fields */ },
+///   "channel": { /* GuildChannel fields (optional) */ }
+/// }
+/// ```
 #[derive(Serialize)]
 pub struct MessagePayload<'a> {
     /// The original Discord message
-    #[serde(flatten)]
     pub message: &'a Message,
 
     /// Guild channel information (if available from cache)
