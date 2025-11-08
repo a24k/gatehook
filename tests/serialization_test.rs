@@ -1,74 +1,79 @@
-use serenity::model::prelude::*;
+//! Serialization tests to verify Discord API compatibility
+//!
+//! These tests ensure that serenity's JSON serialization matches Discord's API specification,
+//! which is critical for webhook consumers reading our event payloads.
+
+use rstest::rstest;
 use serde_json::json;
-use std::collections::HashMap;
+use serenity::model::prelude::*;
 
-#[test]
-fn test_channel_type_serialization() {
-    // Test various ChannelType values to see how they serialize
-    let types = vec![
-        (ChannelType::Text, 0),
-        (ChannelType::Voice, 2),
-        (ChannelType::Category, 4),
-        (ChannelType::News, 5),
-        (ChannelType::PublicThread, 11),
-        (ChannelType::PrivateThread, 12),
-        (ChannelType::NewsThread, 10),
-        (ChannelType::Stage, 13),
-        (ChannelType::Forum, 15),
-    ];
-
-    println!("\n=== ChannelType Serialization ===");
-    for (channel_type, expected_value) in types {
-        let json = serde_json::to_string(&channel_type).unwrap();
-        println!("{:?} serializes to: {} (expected: {})", channel_type, json, expected_value);
-        assert_eq!(json, expected_value.to_string());
-    }
+/// Verify that ChannelType serializes to integers matching Discord API
+///
+/// Discord API uses integer values for channel types, not string names.
+/// This ensures README examples and documentation are accurate.
+#[rstest]
+#[case(ChannelType::Text, 0)]
+#[case(ChannelType::Voice, 2)]
+#[case(ChannelType::Category, 4)]
+#[case(ChannelType::News, 5)]
+#[case(ChannelType::NewsThread, 10)]
+#[case(ChannelType::PublicThread, 11)]
+#[case(ChannelType::PrivateThread, 12)]
+#[case(ChannelType::Stage, 13)]
+#[case(ChannelType::Forum, 15)]
+fn test_channel_type_serializes_as_integer(
+    #[case] channel_type: ChannelType,
+    #[case] expected_value: u8,
+) {
+    let json = serde_json::to_string(&channel_type).unwrap();
+    assert_eq!(json, expected_value.to_string());
 }
 
+/// Verify that GuildChannel uses "type" field name (not "kind")
+///
+/// The Rust field is named `kind` (since `type` is a keyword), but it must
+/// serialize to "type" to match Discord's API and our README documentation.
 #[test]
-fn test_guild_channel_field_names() {
-    // Test by deserializing a Discord API JSON and re-serializing
-    // This will show us what field names serenity uses
+fn test_guild_channel_uses_type_field_name() {
     let discord_api_json = json!({
         "id": "41771983423143937",
         "guild_id": "41771983423143937",
         "name": "general",
-        "type": 0,  // Discord API uses "type"
+        "type": 0,
         "position": 6,
         "permission_overwrites": [],
         "nsfw": false,
     });
 
-    println!("\n=== GuildChannel Field Names ===");
-    println!("Input (Discord API format):\n{}", serde_json::to_string_pretty(&discord_api_json).unwrap());
-
-    // Deserialize from Discord API format
+    // Round-trip: Discord API JSON -> GuildChannel -> JSON
     let channel: GuildChannel = serde_json::from_value(discord_api_json).unwrap();
-
-    // Serialize back to JSON
-    let serialized = serde_json::to_string_pretty(&channel).unwrap();
-    println!("\nSerenity serialized format:\n{}", serialized);
-
-    // Check if the serialized JSON contains "type" or "kind"
+    let serialized = serde_json::to_string(&channel).unwrap();
     let value: serde_json::Value = serde_json::from_str(&serialized).unwrap();
 
-    if value.get("type").is_some() {
-        println!("\n✓ Uses 'type' field (matches Discord API)");
-        println!("  Value: {}", value["type"]);
-    } else if value.get("kind").is_some() {
-        println!("\n✗ Uses 'kind' field (different from Discord API)");
-        println!("  Value: {}", value["kind"]);
-    } else {
-        println!("\n⚠ Neither 'type' nor 'kind' found!");
-    }
+    // Must use "type" field name (Discord API standard)
+    assert!(
+        value.get("type").is_some(),
+        "GuildChannel must serialize with 'type' field"
+    );
+    assert_eq!(value["type"], 0);
+
+    // Must NOT use "kind" field name
+    assert!(
+        value.get("kind").is_none(),
+        "GuildChannel must not use 'kind' field in JSON"
+    );
 }
 
-#[test]
-fn test_message_field_structure() {
-    // Test Message structure to verify field names
-    println!("\n=== Message Field Names ===");
-
-    // Create a minimal message-like JSON
+/// Verify that Message has expected field names
+///
+/// Ensures our README examples match serenity's actual serialization.
+#[rstest]
+#[case("id")]
+#[case("channel_id")]
+#[case("author")]
+#[case("content")]
+#[case("timestamp")]
+fn test_message_has_expected_fields(#[case] field_name: &str) {
     let message_json = json!({
         "id": "123456789012345678",
         "channel_id": "987654321098765432",
@@ -92,45 +97,13 @@ fn test_message_field_structure() {
         "type": 0,
     });
 
-    // Deserialize
     let message: Message = serde_json::from_value(message_json).unwrap();
-
-    // Serialize back
-    let serialized = serde_json::to_string_pretty(&message).unwrap();
-    println!("Message serialized:\n{}", serialized);
-
-    // Parse to check field names
+    let serialized = serde_json::to_string(&message).unwrap();
     let value: serde_json::Value = serde_json::from_str(&serialized).unwrap();
 
-    // Check key fields exist with correct names
-    let mut field_checks = HashMap::new();
-    field_checks.insert("id", value.get("id").is_some());
-    field_checks.insert("channel_id", value.get("channel_id").is_some());
-    field_checks.insert("author", value.get("author").is_some());
-    field_checks.insert("content", value.get("content").is_some());
-    field_checks.insert("timestamp", value.get("timestamp").is_some());
-
-    println!("\n=== Field Name Verification ===");
-    for (field, exists) in field_checks {
-        let status = if exists { "✓" } else { "✗" };
-        println!("{} {} field", status, field);
-    }
-}
-
-#[test]
-fn test_ready_field_structure() {
-    // Note: Ready is difficult to construct manually due to complex types
-    // We'll just document the expected field names
-    println!("\n=== Ready Event Field Names ===");
-    println!("Expected fields in Ready event:");
-    println!("  - v: Gateway version (integer)");
-    println!("  - user: Current user object");
-    println!("  - guilds: Array of unavailable guild objects");
-    println!("  - session_id: Session ID string");
-    println!("  - resume_gateway_url: Resume gateway URL");
-    println!("  - shard: Optional shard information [shard_id, num_shards]");
-    println!("  - application: Partial application object");
-
-    // These match Discord API field names directly
-    println!("\nNote: serenity preserves Discord API field names for Ready event");
+    assert!(
+        value.get(field_name).is_some(),
+        "Message must have '{}' field",
+        field_name
+    );
 }
