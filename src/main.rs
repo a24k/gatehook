@@ -38,10 +38,13 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         let current_user_id = ready.user.id;
 
-        // Initialize EventBridge with cache from Context
-        // The cache is kept alive and updated by Serenity's event loop
+        // Initialize EventBridge with cache and http from Context
+        // Both are kept alive and maintained by Serenity's event loop
         let discord_service = Arc::new(SerenityDiscordService);
-        let channel_info = Arc::new(SerenityChannelInfoProvider::new(ctx.cache.clone()));
+        let channel_info = Arc::new(SerenityChannelInfoProvider::new(
+            ctx.cache.clone(),
+            ctx.http.clone()
+        ));
 
         let endpoint = url::Url::parse(&self.params.http_endpoint)
             .expect("HTTP_ENDPOINT already validated");

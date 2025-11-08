@@ -8,7 +8,6 @@ pub trait ChannelInfoProvider: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `http` - The HTTP client from Context (fallback for cache miss)
     /// * `guild_id` - Optional guild ID for direct cache access (performance optimization)
     ///   - `Some(guild_id)`: Direct guild cache lookup (O(1) - fast)
     ///   - `None`: Search all guilds in cache (O(n) where n = number of guilds)
@@ -21,10 +20,10 @@ pub trait ChannelInfoProvider: Send + Sync {
     /// # Implementation Note
     ///
     /// Implementations that use cache (like SerenityChannelInfoProvider) should hold
-    /// an Arc<Cache> internally, which is automatically updated by Serenity's event loop.
+    /// Arc<Cache> and Arc<Http> internally. These are automatically updated/maintained
+    /// by Serenity's event loop and never change during Client lifetime.
     async fn is_thread(
         &self,
-        http: &serenity::http::Http,
         guild_id: Option<GuildId>,
         channel_id: ChannelId,
     ) -> Result<bool, serenity::Error>;

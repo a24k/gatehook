@@ -33,7 +33,6 @@ impl Default for MockChannelInfoProvider {
 impl ChannelInfoProvider for MockChannelInfoProvider {
     async fn is_thread(
         &self,
-        _http: &serenity::http::Http,
         _guild_id: Option<GuildId>,
         channel_id: ChannelId,
     ) -> Result<bool, serenity::Error> {

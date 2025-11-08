@@ -8,15 +8,16 @@ use tracing::debug;
 /// Implementation for channel information retrieval via Serenity
 ///
 /// Uses cache-first approach with API fallback for optimal performance.
-/// Holds a reference to the cache that is updated by Serenity's event loop.
+/// Holds references to cache and http that are maintained by Serenity's event loop.
 pub struct SerenityChannelInfoProvider {
     cache: Arc<serenity::cache::Cache>,
+    http: Arc<serenity::http::Http>,
 }
 
 impl SerenityChannelInfoProvider {
-    /// Create a new SerenityChannelInfoProvider with a cache reference
-    pub fn new(cache: Arc<serenity::cache::Cache>) -> Self {
-        Self { cache }
+    /// Create a new SerenityChannelInfoProvider with cache and http references
+    pub fn new(cache: Arc<serenity::cache::Cache>, http: Arc<serenity::http::Http>) -> Self {
+        Self { cache, http }
     }
 }
 
@@ -24,7 +25,6 @@ impl SerenityChannelInfoProvider {
 impl ChannelInfoProvider for SerenityChannelInfoProvider {
     async fn is_thread(
         &self,
-        http: &serenity::http::Http,
         guild_id: Option<serenity::model::id::GuildId>,
         channel_id: ChannelId,
     ) -> Result<bool, serenity::Error> {
@@ -83,7 +83,7 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
             "Cache miss, fetching channel info from API"
         );
 
-        let channel = http.get_channel(channel_id).await?;
+        let channel = self.http.get_channel(channel_id).await?;
         let is_thread = matches!(
             channel,
             Channel::Guild(ref c) if matches!(
