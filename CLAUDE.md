@@ -41,7 +41,7 @@ src/
 
 tests/
 ├── adapters/               # Mock implementations
-│   ├── mock_discord.rs
+│   ├── mock_discord_service.rs
 │   ├── mock_event_sender.rs
 │   ├── mock_channel_info.rs
 │   └── mod.rs
@@ -295,11 +295,11 @@ All checks must pass before committing.
 ```
 tests/
 ├── adapters/
-│   ├── mock_discord.rs      # MockDiscordService with RecordedReply/RecordedReaction/RecordedThread
-│   ├── mock_event_sender.rs # MockEventSender with SentEvent
-│   ├── mock_channel_info.rs # MockChannelInfoProvider with configurable responses
-│   └── mod.rs               # Public exports
-└── event_bridge_test.rs     # EventBridge logic tests (Reply/React/Thread actions)
+│   ├── mock_discord_service.rs # MockDiscordService with RecordedReply/RecordedReaction/RecordedThread
+│   ├── mock_event_sender.rs    # MockEventSender with SentEvent
+│   ├── mock_channel_info.rs    # MockChannelInfoProvider with configurable responses
+│   └── mod.rs                  # Public exports
+└── event_bridge_test.rs        # EventBridge logic tests (Reply/React/Thread actions)
 
 src/adapters/event_response.rs  # Contains #[cfg(test)] mod tests (18 tests)
 src/bridge/discord_text.rs      # Contains #[cfg(test)] mod tests (18 tests)
