@@ -190,6 +190,8 @@ Check the `channel.kind` field:
 - `"Voice"` - Voice channel
 - Other types: `"Category"`, `"News"`, `"Stage"`, `"Forum"`, etc.
 
+**Note:** The `kind` field is serialized as an integer in the JSON payload. For the complete mapping of channel type names to numeric values, see [Discord's Channel Type documentation](https://discord.com/developers/docs/resources/channel#channel-object-channel-types).
+
 **Available channel fields** (from Discord's [GuildChannel](https://discord.com/developers/docs/resources/channel#channel-object)):
 - `id` - Channel ID
 - `name` - Channel name
