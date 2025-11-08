@@ -269,12 +269,14 @@ Discord text processing utilities for API length limitations:
 **Always run these checks in order:**
 
 ```bash
-cargo check         # Verify compilation
-cargo clippy        # Lint checks
-cargo test          # Run all tests
+cargo check                  # Verify compilation
+cargo clippy --all-targets   # Lint checks (lib, bin, tests, examples)
+cargo test                   # Run all tests
 ```
 
 All checks must pass before committing.
+
+**Note**: `--all-targets` ensures clippy checks all code including tests and examples, not just the library and binary.
 
 ### Code Style
 

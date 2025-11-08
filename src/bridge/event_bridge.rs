@@ -50,7 +50,6 @@ where
     ///
     /// # Arguments
     ///
-    /// * `cache` - The cache from Context (for retrieving channel information)
     /// * `message` - The message event from Discord
     ///
     /// # Returns
@@ -58,7 +57,6 @@ where
     /// Response from webhook (may contain actions)
     pub async fn handle_message(
         &self,
-        cache: &serenity::cache::Cache,
         message: &Message,
     ) -> anyhow::Result<Option<EventResponse>> {
         debug!(
@@ -68,8 +66,8 @@ where
             "Processing message event"
         );
 
-        // Build payload with channel information from cache
-        let payload = self.build_message_payload(cache, message);
+        // Build payload with channel information (cache-first with API fallback)
+        let payload = self.build_message_payload(message).await;
 
         // Forward event to webhook endpoint and return response
         self.event_sender
@@ -78,24 +76,36 @@ where
             .context("Failed to send message event to HTTP endpoint")
     }
 
-    /// Build MessagePayload with channel information from cache
+    /// Build MessagePayload with channel information
     ///
-    /// Attempts to retrieve GuildChannel from cache (fast path).
-    /// If not available (DM or cache miss), creates payload without channel info.
-    fn build_message_payload<'a>(
+    /// Attempts to retrieve GuildChannel from ChannelInfoProvider (cache-first with API fallback).
+    /// If not available (DM or error), creates payload without channel info.
+    async fn build_message_payload<'a>(
         &self,
-        cache: &serenity::cache::Cache,
         message: &'a Message,
     ) -> MessagePayload<'a> {
-        // Try to get channel from cache (guild messages only)
-        let channel = message.guild_id.and_then(|guild_id| {
-            // Extract channel from cache without holding lock across operations
-            cache.guild(guild_id).and_then(|guild| {
-                guild
-                    .channels
-                    .get(&message.channel_id).cloned()
-            })
-        });
+        // Try to get channel from provider (cache-first, API fallback)
+        let channel = match self.channel_info
+            .get_channel(message.guild_id, message.channel_id)
+            .await
+        {
+            Ok(Some(ch)) => Some(ch),
+            Ok(None) => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    "Channel not found (likely DM)"
+                );
+                None
+            }
+            Err(err) => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    ?err,
+                    "Failed to retrieve channel information"
+                );
+                None
+            }
+        };
 
         match channel {
             Some(ch) => {
@@ -103,18 +113,11 @@ where
                     channel_id = %message.channel_id,
                     channel_name = %ch.name,
                     channel_kind = ?ch.kind,
-                    "Channel information retrieved from cache"
+                    "Channel information retrieved"
                 );
                 MessagePayload::with_channel(message, ch)
             }
-            None => {
-                debug!(
-                    channel_id = %message.channel_id,
-                    guild_id = ?message.guild_id,
-                    "Channel information not available (DM or cache miss)"
-                );
-                MessagePayload::new(message)
-            }
+            None => MessagePayload::new(message),
         }
     }
 
