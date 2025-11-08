@@ -81,6 +81,7 @@ where
     /// Build MessagePayload with channel information from cache
     ///
     /// Attempts to retrieve GuildChannel from cache (fast path).
+    /// Checks both regular channels and threads.
     /// If not available (DM or cache miss), creates payload without channel info.
     fn build_message_payload<'a>(
         &self,
@@ -91,9 +92,15 @@ where
         let channel = message.guild_id.and_then(|guild_id| {
             // Extract channel from cache without holding lock across operations
             cache.guild(guild_id).and_then(|guild| {
-                guild
-                    .channels
-                    .get(&message.channel_id).cloned()
+                // Check regular channels first, then threads
+                guild.channels
+                    .get(&message.channel_id)
+                    .cloned()
+                    .or_else(|| {
+                        guild.threads.iter()
+                            .find(|ch| ch.id == message.channel_id)
+                            .cloned()
+                    })
             })
         });
 
