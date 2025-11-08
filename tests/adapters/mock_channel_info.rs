@@ -29,6 +29,7 @@ impl MockChannelInfoProvider {
     }
 
     /// Set the channel response for a specific channel ID
+    #[allow(dead_code)]
     pub fn set_channel(&self, channel_id: ChannelId, channel: GuildChannel) {
         self.channel_responses
             .lock()
