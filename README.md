@@ -158,10 +158,15 @@ For `message` events in guilds, the payload includes a `channel` field with meta
 {
   "event_type": "message",
   "payload": {
+    // All Discord Message fields (flattened to top level)
     "id": "123456789012345678",
     "content": "Hello!",
     "author": { ... },
-    // ... other Message fields ...
+    "timestamp": "2024-01-15T12:34:56.789Z",
+    "channel_id": "987654321098765432",
+    // ... many other Message fields ...
+
+    // Additional channel metadata (when available)
     "channel": {
       "id": "987654321098765432",
       "name": "general",
@@ -173,6 +178,8 @@ For `message` events in guilds, the payload includes a `channel` field with meta
   }
 }
 ```
+
+**Note:** The `message` fields and `channel` field are at the same level (parallel) in the JSON structure.
 
 **The `channel` field:**
 - **Present:** For guild (server) messages when `MESSAGE_GUILD` is enabled
