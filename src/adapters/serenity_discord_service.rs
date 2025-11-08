@@ -1,16 +1,27 @@
 use super::discord_service::DiscordService;
 use serenity::async_trait;
-use serenity::model::channel::{AutoArchiveDuration, Channel, ChannelType, GuildChannel, Message};
+use serenity::model::channel::{AutoArchiveDuration, GuildChannel, Message};
 use serenity::model::id::{ChannelId, MessageId};
+use std::sync::Arc;
 
 /// Implementation for Discord operations via Serenity
-pub struct SerenityDiscordService;
+///
+/// Holds a reference to the HTTP client that is maintained by Serenity's event loop.
+pub struct SerenityDiscordService {
+    http: Arc<serenity::http::Http>,
+}
+
+impl SerenityDiscordService {
+    /// Create a new SerenityDiscordService with an HTTP client reference
+    pub fn new(http: Arc<serenity::http::Http>) -> Self {
+        Self { http }
+    }
+}
 
 #[async_trait]
 impl DiscordService for SerenityDiscordService {
     async fn react_to_message(
         &self,
-        http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         emoji: &str,
@@ -32,14 +43,13 @@ impl DiscordService for SerenityDiscordService {
             ReactionType::Unicode(emoji.to_string())
         };
 
-        http.create_reaction(channel_id, message_id, &reaction_type)
+        self.http.create_reaction(channel_id, message_id, &reaction_type)
             .await?;
         Ok(())
     }
 
     async fn create_thread_from_message(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         name: &str,
         auto_archive_duration: u16,
@@ -67,25 +77,23 @@ impl DiscordService for SerenityDiscordService {
 
         message
             .channel_id
-            .create_thread_from_message(http, message.id, builder)
+            .create_thread_from_message(&self.http, message.id, builder)
             .await
     }
 
     async fn send_message_to_channel(
         &self,
-        http: &serenity::http::Http,
         channel_id: ChannelId,
         content: &str,
     ) -> Result<Message, serenity::Error> {
         use serenity::builder::CreateMessage;
 
         let builder = CreateMessage::new().content(content);
-        channel_id.send_message(http, builder).await
+        channel_id.send_message(&self.http, builder).await
     }
 
     async fn reply_in_channel(
         &self,
-        http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,
@@ -98,21 +106,6 @@ impl DiscordService for SerenityDiscordService {
             .reference_message((channel_id, message_id))
             .allowed_mentions(CreateAllowedMentions::new().replied_user(mention));
 
-        channel_id.send_message(http, builder).await
-    }
-
-    async fn is_thread_channel(
-        &self,
-        http: &serenity::http::Http,
-        channel_id: ChannelId,
-    ) -> Result<bool, serenity::Error> {
-        let channel = http.get_channel(channel_id).await?;
-        Ok(matches!(
-            channel,
-            Channel::Guild(ref c) if matches!(
-                c.kind,
-                ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread
-            )
-        ))
+        channel_id.send_message(&self.http, builder).await
     }
 }

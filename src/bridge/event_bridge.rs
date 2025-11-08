@@ -1,8 +1,10 @@
 use crate::adapters::{
-    DiscordService, EventResponse, EventSender, ReactParams, ReplyParams, ResponseAction,
-    ThreadParams,
+    ChannelInfoProvider, DiscordService, EventResponse, EventSender, ReactParams, ReplyParams,
+    ResponseAction, ThreadParams,
 };
 use crate::bridge::discord_text::{generate_thread_name, truncate_content, truncate_thread_name};
+use crate::bridge::message_payload::MessagePayload;
+use crate::bridge::ready_payload::ReadyPayload;
 use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -10,19 +12,22 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 
 /// Bridge Discord Gateway events to external endpoints
-pub struct EventBridge<D, S>
+pub struct EventBridge<D, S, C>
 where
     D: DiscordService,
     S: EventSender,
+    C: ChannelInfoProvider,
 {
     discord_service: Arc<D>,
     event_sender: Arc<S>,
+    channel_info: Arc<C>,
 }
 
-impl<D, S> EventBridge<D, S>
+impl<D, S, C> EventBridge<D, S, C>
 where
     D: DiscordService,
     S: EventSender,
+    C: ChannelInfoProvider,
 {
     /// Create a new EventBridge
     ///
@@ -30,10 +35,12 @@ where
     ///
     /// * `discord_service` - The Discord service for operations
     /// * `event_sender` - The event sender for forwarding events
-    pub fn new(discord_service: Arc<D>, event_sender: Arc<S>) -> Self {
+    /// * `channel_info` - The channel info provider for retrieving channel information
+    pub fn new(discord_service: Arc<D>, event_sender: Arc<S>, channel_info: Arc<C>) -> Self {
         Self {
             discord_service,
             event_sender,
+            channel_info,
         }
     }
 
@@ -43,6 +50,7 @@ where
     ///
     /// # Arguments
     ///
+    /// * `cache` - The cache from Context (for retrieving channel information)
     /// * `message` - The message event from Discord
     ///
     /// # Returns
@@ -50,6 +58,7 @@ where
     /// Response from webhook (may contain actions)
     pub async fn handle_message(
         &self,
+        cache: &serenity::cache::Cache,
         message: &Message,
     ) -> anyhow::Result<Option<EventResponse>> {
         debug!(
@@ -59,11 +68,54 @@ where
             "Processing message event"
         );
 
+        // Build payload with channel information from cache
+        let payload = self.build_message_payload(cache, message);
+
         // Forward event to webhook endpoint and return response
         self.event_sender
-            .send("message", message)
+            .send("message", &payload)
             .await
             .context("Failed to send message event to HTTP endpoint")
+    }
+
+    /// Build MessagePayload with channel information from cache
+    ///
+    /// Attempts to retrieve GuildChannel from cache (fast path).
+    /// If not available (DM or cache miss), creates payload without channel info.
+    fn build_message_payload<'a>(
+        &self,
+        cache: &serenity::cache::Cache,
+        message: &'a Message,
+    ) -> MessagePayload<'a> {
+        // Try to get channel from cache (guild messages only)
+        let channel = message.guild_id.and_then(|guild_id| {
+            // Extract channel from cache without holding lock across operations
+            cache.guild(guild_id).and_then(|guild| {
+                guild
+                    .channels
+                    .get(&message.channel_id).cloned()
+            })
+        });
+
+        match channel {
+            Some(ch) => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    channel_name = %ch.name,
+                    channel_kind = ?ch.kind,
+                    "Channel information retrieved from cache"
+                );
+                MessagePayload::with_channel(message, ch)
+            }
+            None => {
+                debug!(
+                    channel_id = %message.channel_id,
+                    guild_id = ?message.guild_id,
+                    "Channel information not available (DM or cache miss)"
+                );
+                MessagePayload::new(message)
+            }
+        }
     }
 
     /// Handle a ready event
@@ -81,9 +133,12 @@ where
             "Processing ready event"
         );
 
+        // Build payload with ready event
+        let payload = ReadyPayload::new(ready);
+
         // Forward event to webhook endpoint and return response
         self.event_sender
-            .send("ready", ready)
+            .send("ready", &payload)
             .await
             .context("Failed to send ready event to HTTP endpoint")
     }
@@ -92,18 +147,16 @@ where
     ///
     /// # Arguments
     ///
-    /// * `http` - The HTTP client for Discord API calls
     /// * `message` - The message that triggered the event (for context)
     /// * `event_response` - The response from webhook containing actions
     pub async fn execute_actions(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         event_response: &EventResponse,
     ) -> anyhow::Result<()> {
         for action in &event_response.actions {
             // Execute action (log error and continue with next)
-            if let Err(err) = self.execute_action(http, message, action).await {
+            if let Err(err) = self.execute_action(message, action).await {
                 error!(?err, ?action, "Failed to execute action, continuing with next");
             }
         }
@@ -113,14 +166,13 @@ where
     /// Execute a single action
     async fn execute_action(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         action: &ResponseAction,
     ) -> anyhow::Result<()> {
         match action {
-            ResponseAction::Reply(params) => self.execute_reply(http, message, params).await,
-            ResponseAction::React(params) => self.execute_react(http, message, params).await,
-            ResponseAction::Thread(params) => self.execute_thread(http, message, params).await,
+            ResponseAction::Reply(params) => self.execute_reply(message, params).await,
+            ResponseAction::React(params) => self.execute_react(message, params).await,
+            ResponseAction::Thread(params) => self.execute_thread(message, params).await,
         }
     }
 
@@ -134,14 +186,13 @@ where
     /// - `params.mention = false`: Reply without ping (default)
     async fn execute_reply(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ReplyParams,
     ) -> anyhow::Result<()> {
         let content = truncate_content(&params.content);
 
         self.discord_service
-            .reply_in_channel(http, message.channel_id, message.id, &content, params.mention)
+            .reply_in_channel(message.channel_id, message.id, &content, params.mention)
             .await
             .context("Failed to send reply to Discord")?;
 
@@ -162,12 +213,11 @@ where
     /// - Custom emoji: "name:id" format (e.g., "customemoji:123456789")
     async fn execute_react(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ReactParams,
     ) -> anyhow::Result<()> {
         self.discord_service
-            .react_to_message(http, message.channel_id, message.id, &params.emoji)
+            .react_to_message(message.channel_id, message.id, &params.emoji)
             .await
             .context("Failed to add reaction to Discord")?;
 
@@ -196,17 +246,16 @@ where
     /// - Invalid values fall back to 1440 (OneDay) with warning log
     async fn execute_thread(
         &self,
-        http: &serenity::http::Http,
         message: &Message,
         params: &ThreadParams,
     ) -> anyhow::Result<()> {
         // Ensure we're in a guild (threads not supported in DM)
-        message.guild_id
+        let guild_id = message.guild_id
             .context("Thread action is not supported in DM")?;
 
-        // Check if already in thread (API call, no cache)
-        let is_in_thread = self.discord_service
-            .is_thread_channel(http, message.channel_id)
+        // Check if already in thread (cache-first with API fallback)
+        let is_in_thread = self.channel_info
+            .is_thread(Some(guild_id), message.channel_id)
             .await
             .context("Failed to check if channel is thread")?;
 
@@ -225,7 +274,6 @@ where
             let thread = self
                 .discord_service
                 .create_thread_from_message(
-                    http,
                     message,
                     &thread_name,
                     params.auto_archive_duration,
@@ -246,7 +294,7 @@ where
 
         // Post message to thread
         self.discord_service
-            .send_message_to_channel(http, target_channel_id, &content)
+            .send_message_to_channel(target_channel_id, &content)
             .await
             .context("Failed to send message to thread")?;
 

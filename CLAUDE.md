@@ -18,14 +18,18 @@ src/
 ├── lib.rs                  # Library exports
 ├── params.rs               # Configuration (env vars)
 ├── adapters/               # External service adapters
-│   ├── discord_service.rs           # Discord operations trait
-│   ├── serenity_discord_service.rs  # Serenity implementation
-│   ├── event_sender_trait.rs        # Event sending trait
-│   ├── http_event_sender.rs         # HTTP implementation
-│   ├── event_response.rs            # Webhook response types (EventResponse, ResponseAction)
+│   ├── discord_service.rs                  # Discord operations trait
+│   ├── serenity_discord_service.rs         # Serenity implementation
+│   ├── channel_info_provider.rs            # Channel information retrieval trait
+│   ├── serenity_channel_info_provider.rs   # Serenity implementation (cache-first)
+│   ├── event_sender_trait.rs               # Event sending trait
+│   ├── http_event_sender.rs                # HTTP implementation
+│   ├── event_response.rs                   # Webhook response types (EventResponse, ResponseAction)
 │   └── mod.rs
 └── bridge/                 # Business logic layer
     ├── event_bridge.rs     # Event processing logic + action execution
+    ├── message_payload.rs  # MessagePayload wrapper with GuildChannel metadata
+    ├── ready_payload.rs    # ReadyPayload wrapper for ready events
     ├── discord_text.rs     # Discord text utilities (truncation, thread name generation)
     ├── message_filter/     # Message filtering by sender type
     │   ├── mod.rs              # Public API re-exports
@@ -37,8 +41,9 @@ src/
 
 tests/
 ├── adapters/               # Mock implementations
-│   ├── mock_discord.rs
+│   ├── mock_discord_service.rs
 │   ├── mock_event_sender.rs
+│   ├── mock_channel_info.rs
 │   └── mod.rs
 └── event_bridge_test.rs    # Integration tests (includes action execution tests)
 ```
@@ -50,11 +55,20 @@ The project follows a **layered architecture** with clear separation of concerns
 ### Adapters Layer (`src/adapters/`)
 External service abstractions and implementations:
 
-- **`DiscordService` trait**: Abstracts Discord operations
-  - Methods: `react_to_message`, `create_thread_from_message`, `send_message_to_channel`, `reply_in_channel`, `is_thread_channel`
+- **`DiscordService` trait**: Abstracts Discord write operations
+  - Methods: `react_to_message`, `create_thread_from_message`, `send_message_to_channel`, `reply_in_channel`
   - `SerenityDiscordService`: Production implementation using serenity
     - Handles Discord API type conversions (e.g., u16 → AutoArchiveDuration)
   - `MockDiscordService` (tests): Records calls for verification
+
+- **`ChannelInfoProvider` trait**: Abstracts Discord read operations (channel metadata)
+  - Separation of concerns: Read operations vs write operations (DiscordService)
+  - Methods: `is_thread_channel`
+  - `SerenityChannelInfoProvider`: Production implementation with **cache-first optimization**
+    - Searches cache via `cache.guilds().iter()` to find channel metadata
+    - Falls back to Discord API (`http.get_channel()`) only on cache miss
+    - Minimizes API rate limit impact when processing all messages
+  - `MockChannelInfoProvider` (tests): Configurable responses via `set_is_thread()`
 
 - **`EventSender` trait**: Abstracts event forwarding
   - Returns `Option<EventResponse>` containing webhook's response actions
@@ -73,16 +87,34 @@ External service abstractions and implementations:
 Business logic that orchestrates adapters:
 
 - **`EventBridge`**: Coordinates Discord and HTTP operations
-  - Generic over `DiscordService` and `EventSender` traits
+  - Generic over `DiscordService`, `EventSender`, and `ChannelInfoProvider` traits
   - Implements ping-pong logic and event forwarding
+  - **Webhook payload enrichment**: Wraps Message with channel metadata via `MessagePayload`
+    - `build_message_payload()`: Retrieves GuildChannel from cache
+    - Cache-first approach: Extracts channel data without holding locks across await points
+    - Sends enriched payload to webhook (Message + optional GuildChannel)
   - **Action execution**: Processes webhook response actions
     - `execute_actions()`: Iterates through actions, logs errors, continues on failure
     - `execute_reply()`: Handles reply action with 2000 char truncation
     - `execute_react()`: Handles reaction action (Unicode/custom emoji parsing)
     - `execute_thread()`: Creates threads with auto-naming, or sends message to existing thread
       - Auto-generates thread name from message if not specified
-      - Detects if already in thread (skips creation, sends message instead)
+      - Detects if already in thread via `ChannelInfoProvider` (skips creation, sends message instead)
   - Fully testable with mocks
+
+- **`MessagePayload`**: Wrapper for webhook payloads with channel metadata
+  - Combines serenity's `Message` with optional `GuildChannel`
+  - `with_channel()`: Constructor for guild messages with channel info
+  - `new()`: Constructor for DMs or cache misses (no channel field)
+  - JSON structure: `{ "message": {...}, "channel": {...} }`
+  - `message` field contains all Discord Message fields
+  - `channel` field omitted from JSON when None via `#[serde(skip_serializing_if)]`
+
+- **`ReadyPayload`**: Wrapper for ready event webhook payloads
+  - Wraps serenity's `Ready` event
+  - `new()`: Constructor that takes ready event reference
+  - JSON structure: `{ "ready": {...} }`
+  - Contains bot connection information (user, guilds, session_id, etc.)
 
 - **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
   - **`MessageFilterPolicy`**: Parsed at startup from environment variables via serde
@@ -129,6 +161,44 @@ Entry point that wires everything together:
     - auto_archive_duration: 60, 1440, 4320, 10080 (minutes)
 - Uses serde with `#[serde(tag = "type")]` for type-safe deserialization
 - Comprehensive tests with rstest for all action types and edge cases
+
+### `adapters/channel_info_provider.rs`
+- `ChannelInfoProvider` trait: Abstracts channel metadata retrieval operations
+- Separates read operations from write operations (DiscordService)
+- Method signature: `async fn is_thread_channel(&self, cache: &Cache, http: &Http, channel_id: ChannelId) -> Result<bool, Error>`
+- Accepts both cache and http for cache-first optimization pattern
+- Enables testing without Discord API access via mock implementations
+
+### `adapters/serenity_channel_info_provider.rs`
+- Production implementation of `ChannelInfoProvider`
+- **Cache-first optimization**: Searches all guilds in cache before API call
+- Implementation details:
+  - Iterates `cache.guilds()` to find channel across all cached guilds
+  - Extracts channel data without holding locks (avoids Send trait issues)
+  - Falls back to `http.get_channel()` only on cache miss
+  - Logs cache hits and misses for observability
+- Thread detection: Checks for `PublicThread`, `PrivateThread`, `NewsThread`
+
+### `bridge/message_payload.rs`
+- `MessagePayload<'a>`: Wrapper struct for webhook payloads
+- Fields:
+  - `message: &'a Message` - Discord Message wrapped in "message" key
+  - `channel: Option<GuildChannel>` - Optional channel metadata, omitted when None
+- JSON structure: `{ "message": {...}, "channel": {...} }`
+- Constructors:
+  - `new(message)` - For DMs or cache misses (no channel info)
+  - `with_channel(message, channel)` - For guild messages with channel metadata
+- Serde attributes:
+  - `#[serde(skip_serializing_if = "Option::is_none")]` on channel: Clean JSON output
+
+### `bridge/ready_payload.rs`
+- `ReadyPayload<'a>`: Wrapper struct for ready event webhook payloads
+- Fields:
+  - `ready: &'a Ready` - Discord Ready event wrapped in "ready" key
+- JSON structure: `{ "ready": {...} }`
+- Constructor:
+  - `new(ready)` - Wraps ready event for webhook delivery
+- Contains bot connection info: user, guilds, session_id, shard info, etc.
 
 ### `bridge/event_bridge.rs`
 - `EventBridge`: Core business logic
@@ -225,10 +295,11 @@ All checks must pass before committing.
 ```
 tests/
 ├── adapters/
-│   ├── mock_discord.rs      # MockDiscordService with RecordedReply/RecordedReaction/RecordedThread
-│   ├── mock_event_sender.rs # MockEventSender with SentEvent
-│   └── mod.rs               # Public exports
-└── event_bridge_test.rs     # EventBridge logic tests (Reply/React/Thread actions)
+│   ├── mock_discord_service.rs # MockDiscordService with RecordedReply/RecordedReaction/RecordedThread
+│   ├── mock_event_sender.rs    # MockEventSender with SentEvent
+│   ├── mock_channel_info.rs    # MockChannelInfoProvider with configurable responses
+│   └── mod.rs                  # Public exports
+└── event_bridge_test.rs        # EventBridge logic tests (Reply/React/Thread actions)
 
 src/adapters/event_response.rs  # Contains #[cfg(test)] mod tests (18 tests)
 src/bridge/discord_text.rs      # Contains #[cfg(test)] mod tests (18 tests)
@@ -268,6 +339,12 @@ src/bridge/message_filter/
 12. **Colocated tests**: Unit tests in same file as implementation using `#[cfg(test)]`
 13. **Adapter layer type conversion**: Discord API-specific types (e.g., AutoArchiveDuration) converted in adapter layer, not business logic
 14. **Utility module extraction**: Discord API constraints (text limits) separated into dedicated module (discord_text)
+15. **Separation of read/write operations**: ChannelInfoProvider (reads) separate from DiscordService (writes) for clear API boundaries
+16. **Cache-first optimization**: Minimize Discord API calls by checking cache before HTTP requests (rate limit management)
+17. **GUILDS intent auto-enabled**: When MESSAGE_GUILD is enabled, GUILDS intent automatically added to populate cache with channel metadata
+18. **Enriched webhook payloads**: Send complete GuildChannel metadata to webhooks instead of just boolean flags (more flexible for webhook consumers)
+19. **Lock-free cache extraction**: Extract data from cache before await points to avoid Send trait issues with Arc<RwLock<>>
+20. **Optional payload fields**: Use `#[serde(skip_serializing_if)]` to keep webhook payloads clean (omit None values)
 
 ### Future Growth Path
 When complexity increases:
@@ -295,10 +372,20 @@ When complexity increases:
 8. Add tests in `tests/event_bridge_test.rs` using mocks
 
 ### Adding New Discord Operation
+
+**For write operations (creating, updating, deleting):**
 1. Add method to `DiscordService` trait in `src/adapters/discord_service.rs`
 2. Implement in `SerenityDiscordService` (accepts `http` parameter)
 3. Implement in `MockDiscordService` (record call for verification)
 4. Use from `EventBridge` by passing `http` from Context
+
+**For read operations (querying metadata, checking state):**
+1. Add method to `ChannelInfoProvider` trait in `src/adapters/channel_info_provider.rs`
+2. Implement in `SerenityChannelInfoProvider` (accepts both `cache` and `http`)
+   - Use cache-first approach: check cache, fallback to API on miss
+   - Extract data from cache before await points (avoid Send trait issues)
+3. Implement in `MockChannelInfoProvider` (return configurable responses)
+4. Use from `EventBridge` by passing both `cache` and `http` from Context
 
 ### Adding Configuration
 1. Add field to `Params` struct in `params.rs`

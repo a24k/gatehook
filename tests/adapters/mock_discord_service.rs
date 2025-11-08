@@ -9,7 +9,6 @@ pub struct MockDiscordService {
     pub reactions: Arc<Mutex<Vec<RecordedReaction>>>,
     pub threads: Arc<Mutex<Vec<RecordedThread>>>,
     pub messages: Arc<Mutex<Vec<RecordedMessage>>>,
-    pub is_thread: Arc<Mutex<bool>>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,12 +53,7 @@ impl MockDiscordService {
             reactions: Arc::new(Mutex::new(Vec::new())),
             threads: Arc::new(Mutex::new(Vec::new())),
             messages: Arc::new(Mutex::new(Vec::new())),
-            is_thread: Arc::new(Mutex::new(false)),
         }
-    }
-
-    pub fn set_is_thread(&self, value: bool) {
-        *self.is_thread.lock().unwrap() = value;
     }
 
     pub fn get_replies(&self) -> Vec<RecordedReply> {
@@ -83,7 +77,6 @@ impl MockDiscordService {
 impl DiscordService for MockDiscordService {
     async fn react_to_message(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         emoji: &str,
@@ -98,7 +91,6 @@ impl DiscordService for MockDiscordService {
 
     async fn create_thread_from_message(
         &self,
-        _http: &serenity::http::Http,
         message: &Message,
         name: &str,
         auto_archive_duration: u16,
@@ -116,7 +108,6 @@ impl DiscordService for MockDiscordService {
 
     async fn send_message_to_channel(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         content: &str,
     ) -> Result<Message, serenity::Error> {
@@ -132,7 +123,6 @@ impl DiscordService for MockDiscordService {
 
     async fn reply_in_channel(
         &self,
-        _http: &serenity::http::Http,
         channel_id: ChannelId,
         message_id: MessageId,
         content: &str,
@@ -154,14 +144,6 @@ impl DiscordService for MockDiscordService {
 
         // Return a dummy Message
         Ok(create_dummy_message(channel_id, content))
-    }
-
-    async fn is_thread_channel(
-        &self,
-        _http: &serenity::http::Http,
-        _channel_id: ChannelId,
-    ) -> Result<bool, serenity::Error> {
-        Ok(*self.is_thread.lock().unwrap())
     }
 }
 

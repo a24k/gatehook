@@ -3,7 +3,7 @@
 
 mod adapters;
 
-use adapters::{MockDiscordService, MockEventSender};
+use adapters::{MockChannelInfoProvider, MockDiscordService, MockEventSender};
 use gatehook::adapters::{ReactParams, ReplyParams, ThreadParams};
 use gatehook::bridge::event_bridge::EventBridge;
 use rstest::rstest;
@@ -46,9 +46,9 @@ async fn test_execute_actions_reply(
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Test message", 111, 222);
 
     // Create EventResponse with reply action
@@ -60,7 +60,7 @@ async fn test_execute_actions_reply(
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -80,9 +80,9 @@ async fn test_execute_actions_multiple_replies() {
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Test", 555, 666);
 
     // Multiple actions
@@ -100,7 +100,7 @@ async fn test_execute_actions_multiple_replies() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -119,9 +119,9 @@ async fn test_execute_actions_long_content_truncated() {
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Test", 777, 888);
 
     // Create content over 2000 chars
@@ -135,7 +135,7 @@ async fn test_execute_actions_long_content_truncated() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -159,12 +159,14 @@ async fn test_handle_message_with_webhook_response() {
         })],
     };
     let event_sender = Arc::new(MockEventSender::with_response(event_response));
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let message = create_test_message("Hello", 999, 1000);
+    let cache = serenity::cache::Cache::default();
 
     // Execute handle_message (which should return the EventResponse)
-    let result = bridge.handle_message(&message).await;
+    let result = bridge.handle_message(&cache, &message).await;
 
     // Verify
     assert!(result.is_ok());
@@ -192,9 +194,9 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("Test message", 111, 222);
 
     // Create EventResponse with react action
@@ -205,7 +207,7 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -223,11 +225,11 @@ async fn test_execute_actions_thread_create_new() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false); // Not in thread
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), false); // Not in thread
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Original message", 111, 222, 333);
 
     // Create EventResponse with thread action
@@ -240,7 +242,7 @@ async fn test_execute_actions_thread_create_new() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok(), "execute_actions should succeed");
@@ -264,11 +266,11 @@ async fn test_execute_actions_thread_auto_name() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false);
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), false);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("This is the original message content", 111, 222, 333);
 
     // Thread action without name (should auto-generate)
@@ -281,7 +283,7 @@ async fn test_execute_actions_thread_auto_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -297,11 +299,11 @@ async fn test_execute_actions_thread_long_name() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false);
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), false);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Original message", 111, 222, 333);
 
     // Thread action with name exceeding 100 chars (should be truncated)
@@ -315,7 +317,7 @@ async fn test_execute_actions_thread_long_name() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -333,11 +335,11 @@ async fn test_execute_actions_thread_already_in_thread() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(true); // Already in thread
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), true); // Already in thread
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Thread message", 111, 222, 333);
 
     // Thread action (should skip thread creation)
@@ -350,7 +352,7 @@ async fn test_execute_actions_thread_already_in_thread() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -370,11 +372,11 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false); // Creating NEW thread
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), false); // Creating NEW thread
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Original", 111, 222, 333);
 
     // Thread action with custom auto_archive_duration
@@ -387,7 +389,7 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());
@@ -412,9 +414,9 @@ async fn test_execute_actions_thread_in_dm_fails() {
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_test_message("DM message", 111, 222); // No guild_id
 
     // Thread action
@@ -427,7 +429,7 @@ async fn test_execute_actions_thread_in_dm_fails() {
     };
 
     // Execute (should complete but log error)
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // execute_actions continues on error, so result is Ok
     assert!(result.is_ok());
@@ -443,11 +445,11 @@ async fn test_execute_actions_mixed_types() {
 
     // Setup
     let discord_service = Arc::new(MockDiscordService::new());
-    discord_service.set_is_thread(false);
     let event_sender = Arc::new(MockEventSender::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    channel_info.set_is_thread(ChannelId::new(222), false);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
-    let http = serenity::http::Http::new("dummy_token");
     let message = create_guild_message("Test", 111, 222, 333);
 
     // Multiple different action types
@@ -469,7 +471,7 @@ async fn test_execute_actions_mixed_types() {
     };
 
     // Execute
-    let result = bridge.execute_actions(&http, &message, &event_response).await;
+    let result = bridge.execute_actions(&message, &event_response).await;
 
     // Verify
     assert!(result.is_ok());

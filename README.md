@@ -138,16 +138,127 @@ RUST_LOG=trace ./gatehook
 
 ## Event Forwarding Format
 
-Events are forwarded to your HTTP endpoint as JSON POST requests:
+Events are forwarded to your HTTP endpoint as JSON POST requests with the event type specified as a query parameter:
+
+```
+POST {HTTP_ENDPOINT}?handler=message
+```
+
+### Message Event Payload
+
+The request body contains the message data wrapped in a `message` key, with optional channel metadata:
 
 ```json
 {
-  "event_type": "message",
-  "payload": {
-    // Discord event data (serenity Message struct serialized)
+  "message": {
+    "id": "123456789012345678",
+    "content": "Hello!",
+    "author": {
+      "id": "234567890123456789",
+      "username": "user123",
+      "discriminator": "0",
+      "avatar": "...",
+      "bot": false
+    },
+    "timestamp": "2024-01-15T12:34:56.789Z",
+    "channel_id": "987654321098765432",
+    "guild_id": "876543210987654321",
+    // ... many other Discord Message fields ...
+  },
+  "channel": {
+    "id": "987654321098765432",
+    "name": "general",
+    "kind": "Text",
+    "parent_id": null,
+    "topic": "General discussion",
+    "position": 0,
+    // ... other GuildChannel fields ...
   }
 }
 ```
+
+**The `channel` field:**
+- **Present:** For guild (server) messages when `MESSAGE_GUILD` is enabled
+- **Absent:** For direct messages, or if channel information is not available in cache
+
+**Detecting threads:**
+Check the `channel.kind` field:
+- `"PublicThread"` - Public thread
+- `"PrivateThread"` - Private thread
+- `"NewsThread"` - News/Announcement thread
+- `"Text"` - Regular text channel
+- `"Voice"` - Voice channel
+- Other types: `"Category"`, `"News"`, `"Stage"`, `"Forum"`, etc.
+
+**Available channel fields** (from Discord's [GuildChannel](https://discord.com/developers/docs/resources/channel#channel-object)):
+- `id` - Channel ID
+- `name` - Channel name
+- `kind` - Channel type (see above)
+- `position` - Sorting position
+- `parent_id` - Parent category ID (null for top-level channels)
+- `topic` - Channel topic/description (if set)
+- `nsfw` - Whether channel is NSFW
+- `thread_metadata` - Thread-specific metadata (if channel is a thread)
+- And more...
+
+**Example: Checking if message is in a thread**
+```python
+# Python example
+def is_in_thread(payload):
+    channel = payload.get("channel")
+    if not channel:
+        return False  # DM or no channel info
+
+    kind = channel.get("kind")
+    return kind in ["PublicThread", "PrivateThread", "NewsThread"]
+```
+
+### Ready Event Payload
+
+When the bot connects to Discord (if `READY` is enabled), a ready event is sent:
+
+```
+POST {HTTP_ENDPOINT}?handler=ready
+```
+
+The request body contains the ready data wrapped in a `ready` key:
+
+```json
+{
+  "ready": {
+    "v": 10,
+    "user": {
+      "id": "123456789012345678",
+      "username": "MyBot",
+      "discriminator": "0",
+      "avatar": "...",
+      "bot": true
+    },
+    "guilds": [
+      {
+        "id": "987654321098765432",
+        "unavailable": false
+      }
+    ],
+    "session_id": "...",
+    "resume_gateway_url": "...",
+    "shard": [0, 1],
+    "application": {
+      "id": "123456789012345678",
+      "flags": 0
+    }
+    // ... other Discord Ready fields ...
+  }
+}
+```
+
+**Ready event fields** (from Discord's [Ready](https://discord.com/developers/docs/topics/gateway-events#ready) event):
+- `v` - Gateway version
+- `user` - Bot user information
+- `guilds` - Guilds the bot is in (may be unavailable during initial connection)
+- `session_id` - Session ID for resuming
+- `shard` - Shard information (if sharding is used)
+- `application` - Application information
 
 ## Webhook Response Actions
 
@@ -385,7 +496,8 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 
 ### Guilds & Channels
 
-- **GUILDS**
+- **GUILDS** *(Auto-enabled with MESSAGE_GUILD)*
+  - [x] Automatically enabled for cache access (guild/channel metadata)
   - [ ] `GUILD_CREATE` `GUILD_UPDATE` `GUILD_DELETE`
   - [ ] `GUILD_ROLE_CREATE` `GUILD_ROLE_UPDATE` `GUILD_ROLE_DELETE`
   - [ ] `CHANNEL_CREATE` `CHANNEL_UPDATE` `CHANNEL_DELETE`

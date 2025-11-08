@@ -3,7 +3,7 @@ mod bridge;
 mod params;
 
 use anyhow::Context as _;
-use adapters::{HttpEventSender, SerenityDiscordService};
+use adapters::{HttpEventSender, SerenityChannelInfoProvider, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
 use bridge::message_filter::MessageFilter;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
 struct Handler {
-    bridge: EventBridge<SerenityDiscordService, HttpEventSender>,
+    bridge: std::sync::OnceLock<EventBridge<SerenityDiscordService, HttpEventSender, SerenityChannelInfoProvider>>,
     params: Arc<params::Params>,
     // Active filters initialized in ready event
     message_direct_filter: std::sync::OnceLock<MessageFilter>,
@@ -24,19 +24,8 @@ struct Handler {
 
 impl Handler {
     fn new(params: &params::Params) -> anyhow::Result<Handler> {
-        let discord_service = Arc::new(SerenityDiscordService);
-
-        let endpoint = url::Url::parse(&params.http_endpoint)
-            .context("Parsing HTTP_ENDPOINT URL")?;
-        let event_sender = Arc::new(HttpEventSender::new(
-            endpoint,
-            params.insecure_mode,
-        )?);
-
-        let bridge = EventBridge::new(discord_service, event_sender);
-
         Ok(Handler {
-            bridge,
+            bridge: std::sync::OnceLock::new(),
             params: Arc::new(params.clone()),
             message_direct_filter: std::sync::OnceLock::new(),
             message_guild_filter: std::sync::OnceLock::new(),
@@ -46,8 +35,26 @@ impl Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         let current_user_id = ready.user.id;
+
+        // Initialize EventBridge with cache and http from Context
+        // Both are kept alive and maintained by Serenity's event loop
+        let discord_service = Arc::new(SerenityDiscordService::new(ctx.http.clone()));
+        let channel_info = Arc::new(SerenityChannelInfoProvider::new(
+            ctx.cache.clone(),
+            ctx.http.clone()
+        ));
+
+        let endpoint = url::Url::parse(&self.params.http_endpoint)
+            .expect("HTTP_ENDPOINT already validated");
+        let event_sender = Arc::new(
+            HttpEventSender::new(endpoint, self.params.insecure_mode)
+                .expect("HttpEventSender already validated")
+        );
+
+        let bridge = EventBridge::new(discord_service, event_sender, channel_info);
+        let _ = self.bridge.set(bridge);
 
         // Initialize active filters with current user ID
         if let Some(policy) = &self.params.message_direct {
@@ -76,8 +83,14 @@ impl EventHandler for Handler {
             return;
         }
 
+        // Get bridge (should be initialized above)
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
         // Handle event (send to webhook + execute actions if needed)
-        match self.bridge.handle_ready(&ready).await {
+        match bridge.handle_ready(&ready).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Currently ready event doesn't have associated message context,
                 // so we log and skip action execution
@@ -115,13 +128,18 @@ impl EventHandler for Handler {
             return;
         }
 
+        // Get bridge (should be initialized by ready event)
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
         // Handle event (send to webhook + execute actions)
-        match self.bridge.handle_message(&message).await {
+        match bridge.handle_message(&ctx.cache, &message).await {
             Ok(Some(event_response)) if !event_response.actions.is_empty() => {
                 // Execute actions if webhook responded with any
-                if let Err(err) = self
-                    .bridge
-                    .execute_actions(&ctx.http, &message, &event_response)
+                if let Err(err) = bridge
+                    .execute_actions(&message, &event_response)
                     .await
                 {
                     error!(?err, "Failed to execute actions from webhook response");
@@ -193,6 +211,8 @@ fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
     if params.has_guild_message_events() {
         intents |= GatewayIntents::GUILD_MESSAGES;
         intents |= GatewayIntents::MESSAGE_CONTENT;
+        // GUILDS intent is required for cache access (guild/channel data)
+        intents |= GatewayIntents::GUILDS;
     }
 
     intents
