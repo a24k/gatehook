@@ -541,15 +541,16 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 - **GUILD_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_GUILD`
   - [ ] `MESSAGE_UPDATE`
-  - [ ] `MESSAGE_DELETE`
-  - [ ] `MESSAGE_DELETE_BULK`
+  - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_GUILD`
+  - [x] `MESSAGE_DELETE_BULK` via `MESSAGE_DELETE_BULK_GUILD`
 - **DIRECT_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_DIRECT`
   - [ ] `MESSAGE_UPDATE`
-  - [ ] `MESSAGE_DELETE`
+  - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_DIRECT`
   - [ ] `CHANNEL_PINS_UPDATE`
-- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_*)*
+- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE)*
   - Automatically enabled when MESSAGE_DIRECT or MESSAGE_GUILD is configured
+  - Not required for MESSAGE_DELETE events (only IDs available, no content)
 - **GUILD_MESSAGE_REACTIONS**
   - [ ] `MESSAGE_REACTION_ADD`
   - [ ] `MESSAGE_REACTION_REMOVE`
