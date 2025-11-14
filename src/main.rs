@@ -166,9 +166,9 @@ impl EventHandler for Handler {
 
         // Check if event is enabled for this context
         let enabled = if is_direct {
-            self.params.message_delete_direct.unwrap_or(false)
+            self.params.message_delete_direct.is_some()
         } else {
-            self.params.message_delete_guild.unwrap_or(false)
+            self.params.message_delete_guild.is_some()
         };
 
         if !enabled {
@@ -210,7 +210,7 @@ impl EventHandler for Handler {
         guild_id: Option<GuildId>,
     ) {
         // Check if event is enabled
-        if !self.params.message_delete_bulk_guild.unwrap_or(false) {
+        if self.params.message_delete_bulk_guild.is_none() {
             return;
         }
 

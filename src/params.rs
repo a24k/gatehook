@@ -33,11 +33,11 @@ pub struct Params {
 
     // Message Delete Events
     #[serde(default)]
-    pub message_delete_direct: Option<bool>,
+    pub message_delete_direct: Option<String>,
     #[serde(default)]
-    pub message_delete_guild: Option<bool>,
+    pub message_delete_guild: Option<String>,
     #[serde(default)]
-    pub message_delete_bulk_guild: Option<bool>,
+    pub message_delete_bulk_guild: Option<String>,
 
     // Context-Independent Events
     #[serde(default)]
