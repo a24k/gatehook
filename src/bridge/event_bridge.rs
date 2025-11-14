@@ -3,11 +3,14 @@ use crate::adapters::{
     ResponseAction, ThreadParams,
 };
 use crate::bridge::discord_text::{generate_thread_name, truncate_content, truncate_thread_name};
+use crate::bridge::message_delete_bulk_payload::MessageDeleteBulkPayload;
+use crate::bridge::message_delete_payload::MessageDeletePayload;
 use crate::bridge::message_payload::MessagePayload;
 use crate::bridge::ready_payload::ReadyPayload;
 use anyhow::Context as _;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::id::{ChannelId, GuildId, MessageId};
 use std::sync::Arc;
 use tracing::{debug, error, info};
 
@@ -308,5 +311,75 @@ where
         );
 
         Ok(())
+    }
+
+    /// Handle a message_delete event
+    ///
+    /// Sends event to webhook and returns the response.
+    /// Note: Actions are not supported for delete events.
+    ///
+    /// # Arguments
+    ///
+    /// * `channel_id` - The channel where the message was deleted
+    /// * `message_id` - The ID of the deleted message
+    /// * `guild_id` - The guild ID (None for DMs)
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (actions are not supported for delete events)
+    pub async fn handle_message_delete(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        guild_id: Option<GuildId>,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            message_id = %message_id,
+            channel_id = %channel_id,
+            ?guild_id,
+            "Processing message_delete event"
+        );
+
+        let payload = MessageDeletePayload::new(channel_id, message_id, guild_id);
+
+        self.event_sender
+            .send("message_delete", &payload)
+            .await
+            .context("Failed to send message_delete event to HTTP endpoint")
+    }
+
+    /// Handle a message_delete_bulk event
+    ///
+    /// Sends event to webhook and returns the response.
+    /// Note: Actions are not supported for delete events.
+    ///
+    /// # Arguments
+    ///
+    /// * `channel_id` - The channel where messages were deleted
+    /// * `message_ids` - The IDs of deleted messages
+    /// * `guild_id` - The guild ID (None for DMs, but bulk delete is typically guild-only)
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (actions are not supported for delete events)
+    pub async fn handle_message_delete_bulk(
+        &self,
+        channel_id: ChannelId,
+        message_ids: Vec<MessageId>,
+        guild_id: Option<GuildId>,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            message_count = message_ids.len(),
+            channel_id = %channel_id,
+            ?guild_id,
+            "Processing message_delete_bulk event"
+        );
+
+        let payload = MessageDeleteBulkPayload::new(channel_id, message_ids, guild_id);
+
+        self.event_sender
+            .send("message_delete_bulk", &payload)
+            .await
+            .context("Failed to send message_delete_bulk event to HTTP endpoint")
     }
 }

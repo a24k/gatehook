@@ -31,6 +31,14 @@ pub struct Params {
     #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
     pub message_guild: Option<MessageFilterPolicy>,
 
+    // Message Delete Events
+    #[serde(default)]
+    pub message_delete_direct: Option<bool>,
+    #[serde(default)]
+    pub message_delete_guild: Option<bool>,
+    #[serde(default)]
+    pub message_delete_bulk_guild: Option<bool>,
+
     // Context-Independent Events
     #[serde(default)]
     pub ready: Option<String>,
@@ -63,6 +71,9 @@ impl std::fmt::Debug for Params {
             .field("http_endpoint", &self.http_endpoint)
             .field("message_direct", &self.message_direct)
             .field("message_guild", &self.message_guild)
+            .field("message_delete_direct", &self.message_delete_direct)
+            .field("message_delete_guild", &self.message_delete_guild)
+            .field("message_delete_bulk_guild", &self.message_delete_bulk_guild)
             .field("ready", &self.ready)
             .finish()
     }
@@ -81,6 +92,16 @@ impl Params {
     /// Check if Guild Message events are enabled
     pub fn has_guild_message_events(&self) -> bool {
         self.message_guild.is_some()
+    }
+
+    /// Check if any MESSAGE_DELETE events are enabled
+    pub fn has_message_delete_events(&self) -> bool {
+        self.message_delete_direct.is_some() || self.message_delete_guild.is_some()
+    }
+
+    /// Check if MESSAGE_DELETE_BULK event is enabled
+    pub fn has_message_delete_bulk_events(&self) -> bool {
+        self.message_delete_bulk_guild.is_some()
     }
 }
 
@@ -106,6 +127,9 @@ mod tests {
             http_endpoint: "https://example.com/webhook/secret123456".to_string(),
             message_direct: None,
             message_guild: None,
+            message_delete_direct: None,
+            message_delete_guild: None,
+            message_delete_bulk_guild: None,
             ready: None,
         };
 
