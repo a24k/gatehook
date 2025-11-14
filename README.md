@@ -480,8 +480,8 @@ If your endpoint returns an empty response or no `actions` field, no actions are
   - [ ] `MESSAGE_UPDATE`
   - [ ] `MESSAGE_DELETE`
   - [ ] `CHANNEL_PINS_UPDATE`
-- **MESSAGE_CONTENT** *(Auto-enabled with MESSAGE_*)*
-  - [x] Automatically enabled
+- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_*)*
+  - Automatically enabled when MESSAGE_DIRECT or MESSAGE_GUILD is configured
 - **GUILD_MESSAGE_REACTIONS**
   - [ ] `MESSAGE_REACTION_ADD`
   - [ ] `MESSAGE_REACTION_REMOVE`
@@ -500,7 +500,7 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 ### Guilds & Channels
 
 - **GUILDS** *(Auto-enabled with MESSAGE_GUILD)*
-  - [x] Automatically enabled for cache access (guild/channel metadata)
+  - Automatically enabled for cache access (guild/channel metadata)
   - [ ] `GUILD_CREATE` `GUILD_UPDATE` `GUILD_DELETE`
   - [ ] `GUILD_ROLE_CREATE` `GUILD_ROLE_UPDATE` `GUILD_ROLE_DELETE`
   - [ ] `CHANNEL_CREATE` `CHANNEL_UPDATE` `CHANNEL_DELETE`
