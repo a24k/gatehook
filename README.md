@@ -67,9 +67,11 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
 | Event | Direct Variable | Guild Variable | Description |
 |-------|----------------|----------------|-------------|
 | Message | `MESSAGE_DIRECT` | `MESSAGE_GUILD` | New message created |
+| Message Delete | `MESSAGE_DELETE_DIRECT` | `MESSAGE_DELETE_GUILD` | Single message deleted |
+| Message Delete Bulk | - | `MESSAGE_DELETE_BULK_GUILD` | Multiple messages deleted at once (guild only) |
 | Ready | - | `READY` | Bot connected to Discord |
 
-*More events coming soon: MESSAGE_UPDATE, MESSAGE_DELETE, REACTION_ADD, etc.*
+*More events coming soon: MESSAGE_UPDATE, REACTION_ADD, etc.*
 
 #### Configuration Examples
 
@@ -92,6 +94,13 @@ MESSAGE_DIRECT=""
 
 # Example 5: Enable READY event forwarding
 READY="all"
+
+# Example 6: Log message deletions (no filtering available for delete events)
+MESSAGE_DELETE_GUILD=all
+MESSAGE_DELETE_BULK_GUILD=all
+
+# Example 7: Monitor DM deletions
+MESSAGE_DELETE_DIRECT=all
 ```
 
 ### Sender Type Classification
@@ -262,6 +271,65 @@ The request body contains the ready data wrapped in a `ready` key:
 - `session_id` - Session ID for resuming
 - `shard` - Shard information (if sharding is used)
 - `application` - Application information
+
+### Message Delete Event Payload
+
+When a single message is deleted (if `MESSAGE_DELETE_DIRECT` or `MESSAGE_DELETE_GUILD` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=message_delete
+```
+
+The request body contains only IDs (no message content available):
+
+```json
+{
+  "message_delete": {
+    "id": "1234567890123456789",
+    "channel_id": "9876543210987654321",
+    "guild_id": "1111111111111111111"
+  }
+}
+```
+
+**Note:** The `guild_id` field is omitted for direct messages.
+
+**Important limitations:**
+- Discord only provides message IDs, not the content, author, or timestamp
+- Deleted message content can only be obtained if you cached messages before deletion
+- Message filtering (by sender type) is not available for delete events
+- Webhook response actions are not supported for delete events
+
+### Message Delete Bulk Event Payload
+
+When multiple messages are deleted at once (if `MESSAGE_DELETE_BULK_GUILD` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=message_delete_bulk
+```
+
+The request body contains multiple message IDs:
+
+```json
+{
+  "message_delete_bulk": {
+    "ids": [
+      "1234567890123456789",
+      "2345678901234567890",
+      "3456789012345678901"
+    ],
+    "channel_id": "9876543210987654321",
+    "guild_id": "1111111111111111111"
+  }
+}
+```
+
+**Use cases:**
+- Moderation logging (track when moderators bulk-delete messages)
+- Compliance and audit trails
+- Anti-spam detection (large bulk deletes may indicate spam cleanup)
+
+**Note:** Bulk delete only occurs in guilds (not DMs) when using Discord's bulk delete API. The same limitations as single delete apply - no content available.
 
 ## Webhook Response Actions
 
@@ -473,15 +541,16 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 - **GUILD_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_GUILD`
   - [ ] `MESSAGE_UPDATE`
-  - [ ] `MESSAGE_DELETE`
-  - [ ] `MESSAGE_DELETE_BULK`
+  - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_GUILD`
+  - [x] `MESSAGE_DELETE_BULK` via `MESSAGE_DELETE_BULK_GUILD`
 - **DIRECT_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_DIRECT`
   - [ ] `MESSAGE_UPDATE`
-  - [ ] `MESSAGE_DELETE`
+  - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_DIRECT`
   - [ ] `CHANNEL_PINS_UPDATE`
-- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_*)*
+- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE)*
   - Automatically enabled when MESSAGE_DIRECT or MESSAGE_GUILD is configured
+  - Not required for MESSAGE_DELETE events (only IDs available, no content)
 - **GUILD_MESSAGE_REACTIONS**
   - [ ] `MESSAGE_REACTION_ADD`
   - [ ] `MESSAGE_REACTION_REMOVE`

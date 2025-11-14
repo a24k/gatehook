@@ -564,3 +564,151 @@ async fn test_handle_message_without_channel_info() {
         "Payload should not contain channel field when channel info is unavailable"
     );
 }
+
+#[tokio::test]
+async fn test_handle_message_delete() {
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let channel_id = ChannelId::new(999);
+    let message_id = MessageId::new(888);
+    let guild_id = Some(GuildId::new(777));
+
+    // Execute handle_message_delete
+    let result = bridge
+        .handle_message_delete(channel_id, message_id, guild_id)
+        .await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(sent_events[0].handler, "message_delete");
+
+    // Verify payload structure
+    let payload_json = &sent_events[0].payload;
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+
+    assert_eq!(json_value["message_delete"]["id"], "888");
+    assert_eq!(json_value["message_delete"]["channel_id"], "999");
+    assert_eq!(json_value["message_delete"]["guild_id"], "777");
+}
+
+#[tokio::test]
+async fn test_handle_message_delete_without_guild() {
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let channel_id = ChannelId::new(999);
+    let message_id = MessageId::new(888);
+
+    // Execute handle_message_delete (DM scenario)
+    let result = bridge
+        .handle_message_delete(channel_id, message_id, None)
+        .await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1);
+    assert_eq!(sent_events[0].handler, "message_delete");
+
+    // Verify guild_id is omitted
+    let payload_json = &sent_events[0].payload;
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+
+    assert_eq!(json_value["message_delete"]["id"], "888");
+    assert_eq!(json_value["message_delete"]["channel_id"], "999");
+    assert!(
+        json_value["message_delete"].get("guild_id").is_none(),
+        "guild_id should be omitted for DMs"
+    );
+}
+
+#[tokio::test]
+async fn test_handle_message_delete_bulk() {
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let channel_id = ChannelId::new(999);
+    let message_ids = vec![
+        MessageId::new(111),
+        MessageId::new(222),
+        MessageId::new(333),
+    ];
+    let guild_id = Some(GuildId::new(777));
+
+    // Execute handle_message_delete_bulk
+    let result = bridge
+        .handle_message_delete_bulk(channel_id, message_ids.clone(), guild_id)
+        .await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(sent_events[0].handler, "message_delete_bulk");
+
+    // Verify payload structure
+    let payload_json = &sent_events[0].payload;
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+
+    let ids = json_value["message_delete_bulk"]["ids"]
+        .as_array()
+        .expect("ids should be an array");
+    assert_eq!(ids.len(), 3);
+    assert_eq!(ids[0], "111");
+    assert_eq!(ids[1], "222");
+    assert_eq!(ids[2], "333");
+    assert_eq!(json_value["message_delete_bulk"]["channel_id"], "999");
+    assert_eq!(json_value["message_delete_bulk"]["guild_id"], "777");
+}
+
+#[tokio::test]
+async fn test_handle_message_delete_bulk_empty() {
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let channel_id = ChannelId::new(999);
+    let message_ids: Vec<MessageId> = vec![];
+    let guild_id = Some(GuildId::new(777));
+
+    // Execute handle_message_delete_bulk with empty list
+    let result = bridge
+        .handle_message_delete_bulk(channel_id, message_ids, guild_id)
+        .await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1);
+
+    // Verify empty ids array
+    let payload_json = &sent_events[0].payload;
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+
+    let ids = json_value["message_delete_bulk"]["ids"]
+        .as_array()
+        .expect("ids should be an array");
+    assert_eq!(ids.len(), 0, "Should have empty ids array");
+}

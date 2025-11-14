@@ -12,6 +12,7 @@ use tracing::{error, info};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
 
 struct Handler {
@@ -153,6 +154,86 @@ impl EventHandler for Handler {
             }
         }
     }
+
+    async fn message_delete(
+        &self,
+        _ctx: Context,
+        channel_id: ChannelId,
+        deleted_message_id: MessageId,
+        guild_id: Option<GuildId>,
+    ) {
+        // Check if event is enabled for this context
+        match guild_id {
+            None if self.params.message_delete_direct.is_none() => return,
+            Some(_) if self.params.message_delete_guild.is_none() => return,
+            _ => {}
+        }
+
+        // Get bridge
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
+        // Handle event
+        match bridge
+            .handle_message_delete(channel_id, deleted_message_id, guild_id)
+            .await
+        {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                tracing::warn!(
+                    action_count = event_response.actions.len(),
+                    "MessageDelete event received actions from webhook, \
+                     but action execution is not supported for delete events"
+                );
+            }
+            Ok(_) => {
+                // Success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle message_delete event");
+            }
+        }
+    }
+
+    async fn message_delete_bulk(
+        &self,
+        _ctx: Context,
+        channel_id: ChannelId,
+        multiple_deleted_messages_ids: Vec<MessageId>,
+        guild_id: Option<GuildId>,
+    ) {
+        // Check if event is enabled
+        if self.params.message_delete_bulk_guild.is_none() {
+            return;
+        }
+
+        // Get bridge
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
+        // Handle event
+        match bridge
+            .handle_message_delete_bulk(channel_id, multiple_deleted_messages_ids, guild_id)
+            .await
+        {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                tracing::warn!(
+                    action_count = event_response.actions.len(),
+                    "MessageDeleteBulk event received actions from webhook, \
+                     but action execution is not supported for delete events"
+                );
+            }
+            Ok(_) => {
+                // Success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle message_delete_bulk event");
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -201,18 +282,29 @@ async fn main() -> anyhow::Result<()> {
 fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
     let mut intents = GatewayIntents::empty();
 
-    // Direct Message events
-    if params.has_direct_message_events() {
+    // Direct Message events (MESSAGE and MESSAGE_DELETE)
+    if params.has_direct_message_events() || params.has_message_delete_events() {
         intents |= GatewayIntents::DIRECT_MESSAGES;
+    }
+
+    // MESSAGE_CONTENT is only needed for MESSAGE events, not DELETE
+    if params.has_direct_message_events() {
         intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 
-    // Guild Message events
-    if params.has_guild_message_events() {
+    // Guild Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_DELETE_BULK)
+    if params.has_guild_message_events()
+        || params.has_message_delete_events()
+        || params.has_message_delete_bulk_events()
+    {
         intents |= GatewayIntents::GUILD_MESSAGES;
-        intents |= GatewayIntents::MESSAGE_CONTENT;
         // GUILDS intent is required for cache access (guild/channel data)
         intents |= GatewayIntents::GUILDS;
+    }
+
+    // MESSAGE_CONTENT is only needed for MESSAGE events, not DELETE
+    if params.has_guild_message_events() {
+        intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 
     intents
