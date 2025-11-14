@@ -162,17 +162,11 @@ impl EventHandler for Handler {
         deleted_message_id: MessageId,
         guild_id: Option<GuildId>,
     ) {
-        let is_direct = guild_id.is_none();
-
         // Check if event is enabled for this context
-        let enabled = if is_direct {
-            self.params.message_delete_direct.is_some()
-        } else {
-            self.params.message_delete_guild.is_some()
-        };
-
-        if !enabled {
-            return;
+        match guild_id {
+            None if self.params.message_delete_direct.is_none() => return,
+            Some(_) if self.params.message_delete_guild.is_none() => return,
+            _ => {}
         }
 
         // Get bridge
