@@ -19,11 +19,11 @@ use serenity::model::id::{ChannelId, GuildId, MessageId};
 /// ```
 #[derive(Debug, Clone, Serialize)]
 pub struct MessageDeleteBulkPayload {
-    pub message_delete_bulk: MessageDeleteBulkData,
+    pub message_delete_bulk: MessageDeleteBulk,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct MessageDeleteBulkData {
+pub struct MessageDeleteBulk {
     /// IDs of the deleted messages
     pub ids: Vec<MessageId>,
     /// ID of the channel where messages were deleted
@@ -47,7 +47,7 @@ impl MessageDeleteBulkPayload {
         guild_id: Option<GuildId>,
     ) -> Self {
         Self {
-            message_delete_bulk: MessageDeleteBulkData {
+            message_delete_bulk: MessageDeleteBulk {
                 ids: message_ids,
                 channel_id,
                 guild_id,
