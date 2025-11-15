@@ -7,7 +7,6 @@
 //! All functions properly handle Unicode characters (multibyte) by counting
 //! characters rather than bytes.
 
-use serenity::model::channel::Message;
 use tracing::warn;
 
 /// Truncate content to Discord's 2000 character limit
@@ -35,26 +34,6 @@ pub fn truncate_content(content: &str) -> String {
     }
 }
 
-/// Generate thread name from message content
-///
-/// Uses first line of message content (max 100 chars, Discord API limit).
-/// Returns "Thread" if content is empty after trimming.
-pub fn generate_thread_name(message: &Message) -> String {
-    // Use first line only, trim whitespace
-    let content = message
-        .content
-        .lines()
-        .next()
-        .unwrap_or("")
-        .trim();
-
-    if content.is_empty() {
-        return "Thread".to_string();
-    }
-
-    truncate_thread_name(content)
-}
-
 /// Truncate thread name to Discord's 100 character limit
 ///
 /// If name exceeds limit, truncates to 100 chars.
@@ -75,19 +54,6 @@ pub fn truncate_thread_name(name: &str) -> String {
 mod tests {
     use super::*;
     use rstest::rstest;
-    use serenity::model::channel::Message;
-    use serenity::model::id::{ChannelId, MessageId};
-    use serenity::model::user::User;
-
-    // Helper to create a test message with specific content
-    fn create_message(content: &str) -> Message {
-        let mut message = Message::default();
-        message.id = MessageId::new(1);
-        message.channel_id = ChannelId::new(1);
-        message.content = content.to_string();
-        message.author = User::default();
-        message
-    }
 
     // Tests for truncate_content
 
@@ -167,71 +133,4 @@ mod tests {
         assert_eq!(result.chars().count(), 100);
     }
 
-    // Tests for generate_thread_name
-
-    #[test]
-    fn test_generate_thread_name_from_content() {
-        let message = create_message("This is a test message");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "This is a test message");
-    }
-
-    #[test]
-    fn test_generate_thread_name_empty_message() {
-        let message = create_message("");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "Thread");
-    }
-
-    #[test]
-    fn test_generate_thread_name_whitespace_only() {
-        let message = create_message("   \t\n   ");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "Thread");
-    }
-
-    #[test]
-    fn test_generate_thread_name_trims_whitespace() {
-        let message = create_message("  Hello World  ");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "Hello World");
-    }
-
-    #[test]
-    fn test_generate_thread_name_first_line_only() {
-        let message = create_message("First line\nSecond line\nThird line");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "First line");
-    }
-
-    #[test]
-    fn test_generate_thread_name_truncates_long_line() {
-        let long_line = "a".repeat(150);
-        let message = create_message(&long_line);
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result.chars().count(), 100);
-        assert_eq!(result, "a".repeat(100));
-    }
-
-    #[test]
-    fn test_generate_thread_name_first_line_with_trailing_newlines() {
-        let message = create_message("First line\n\n\n");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "First line");
-    }
-
-    #[test]
-    fn test_generate_thread_name_multiline_with_whitespace() {
-        let message = create_message("  First line  \nSecond line");
-        let result = generate_thread_name(&message);
-
-        assert_eq!(result, "First line");
-    }
 }

@@ -28,6 +28,7 @@ pub struct RecordedReaction {
 
 #[derive(Debug, Clone)]
 pub struct RecordedThread {
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub name: String,
     pub auto_archive_duration: u16,
@@ -91,19 +92,21 @@ impl DiscordService for MockDiscordService {
 
     async fn create_thread_from_message(
         &self,
-        message: &Message,
+        channel_id: ChannelId,
+        message_id: MessageId,
         name: &str,
         auto_archive_duration: u16,
     ) -> Result<GuildChannel, serenity::Error> {
         self.threads.lock().unwrap().push(RecordedThread {
-            message_id: message.id,
+            channel_id,
+            message_id,
             name: name.to_string(),
             auto_archive_duration,
         });
 
         // Return a dummy GuildChannel
         // Note: In real tests, we use the recorded data to verify behavior
-        Ok(create_dummy_guild_channel(message.channel_id))
+        Ok(create_dummy_guild_channel(channel_id))
     }
 
     async fn send_message_to_channel(
