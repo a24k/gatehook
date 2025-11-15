@@ -248,8 +248,9 @@ async fn test_execute_actions_thread_create_new() {
 
     let threads = discord_service.get_threads();
     assert_eq!(threads.len(), 1, "Should create one thread");
-    assert_eq!(threads[0].name, "Discussion");
+    assert_eq!(threads[0].channel_id, ChannelId::new(222));
     assert_eq!(threads[0].message_id, MessageId::new(111));
+    assert_eq!(threads[0].name, "Discussion");
     assert_eq!(threads[0].auto_archive_duration, 1440);
 
     let messages = discord_service.get_messages();

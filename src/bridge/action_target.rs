@@ -12,6 +12,7 @@ pub struct ActionTarget {
     pub channel_id: ChannelId,
 }
 
+#[cfg(test)]
 impl ActionTarget {
     /// Create a new ActionTarget with the given message and channel IDs.
     pub fn new(message_id: MessageId, channel_id: ChannelId) -> Self {
