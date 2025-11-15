@@ -96,11 +96,11 @@ MESSAGE_DIRECT=""
 READY="all"
 
 # Example 6: Log message deletions (no filtering available for delete events)
-MESSAGE_DELETE_GUILD=all
-MESSAGE_DELETE_BULK_GUILD=all
+MESSAGE_DELETE_GUILD="all"
+MESSAGE_DELETE_BULK_GUILD="all"
 
 # Example 7: Monitor DM deletions
-MESSAGE_DELETE_DIRECT=all
+MESSAGE_DELETE_DIRECT="all"
 ```
 
 ### Sender Type Classification
