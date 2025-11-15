@@ -26,12 +26,14 @@ pub trait DiscordService: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `message` - The message to create a thread from
+    /// * `channel_id` - The channel where the message is located
+    /// * `message_id` - The message to create a thread from
     /// * `name` - The thread name
     /// * `auto_archive_duration` - Auto-archive duration in minutes (60, 1440, 4320, 10080)
     async fn create_thread_from_message(
         &self,
-        message: &Message,
+        channel_id: ChannelId,
+        message_id: MessageId,
         name: &str,
         auto_archive_duration: u16,
     ) -> Result<GuildChannel, serenity::Error>;

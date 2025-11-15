@@ -50,7 +50,8 @@ impl DiscordService for SerenityDiscordService {
 
     async fn create_thread_from_message(
         &self,
-        message: &Message,
+        channel_id: ChannelId,
+        message_id: MessageId,
         name: &str,
         auto_archive_duration: u16,
     ) -> Result<GuildChannel, serenity::Error> {
@@ -75,9 +76,8 @@ impl DiscordService for SerenityDiscordService {
         let builder = CreateThread::new(name.to_string())
             .auto_archive_duration(auto_archive_duration);
 
-        message
-            .channel_id
-            .create_thread_from_message(&self.http, message.id, builder)
+        channel_id
+            .create_thread_from_message(&self.http, message_id, builder)
             .await
     }
 

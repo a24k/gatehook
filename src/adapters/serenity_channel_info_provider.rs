@@ -25,14 +25,12 @@ impl SerenityChannelInfoProvider {
 impl ChannelInfoProvider for SerenityChannelInfoProvider {
     async fn is_thread(
         &self,
-        guild_id: Option<serenity::model::id::GuildId>,
         channel_id: ChannelId,
     ) -> Result<bool, serenity::Error> {
         // Try cache first (fast path)
-        // Extract channel kind from cache without holding the lock across await points
-        let cached_result: Option<bool> = if let Some(gid) = guild_id {
-            // Direct guild access (O(1) - fast)
-            self.cache.guild(gid).and_then(|guild_ref| {
+        // Search all guilds for the channel
+        let cached_result: Option<bool> = self.cache.guilds().iter().find_map(|guild_id| {
+            self.cache.guild(*guild_id).and_then(|guild_ref| {
                 // Check regular channels first, then threads
                 guild_ref.channels
                     .get(&channel_id)
@@ -50,45 +48,15 @@ impl ChannelInfoProvider for SerenityChannelInfoProvider {
                                 | ChannelType::NewsThread
                         );
                         debug!(
-                            guild_id = %gid,
+                            guild_id = %guild_id,
                             channel_id = %channel_id,
                             is_thread = is_thread,
-                            "Channel type resolved from cache (direct guild access)"
+                            "Channel type resolved from cache"
                         );
                         is_thread
                     })
             })
-        } else {
-            // Search all guilds (O(n) - slower fallback)
-            self.cache.guilds().iter().find_map(|guild_id| {
-                self.cache.guild(*guild_id).and_then(|guild_ref| {
-                    // Check regular channels first, then threads
-                    guild_ref.channels
-                        .get(&channel_id)
-                        .cloned()
-                        .or_else(|| {
-                            guild_ref.threads.iter()
-                                .find(|ch| ch.id == channel_id)
-                                .cloned()
-                        })
-                        .map(|channel| {
-                            let is_thread = matches!(
-                                channel.kind,
-                                ChannelType::PublicThread
-                                    | ChannelType::PrivateThread
-                                    | ChannelType::NewsThread
-                            );
-                            debug!(
-                                guild_id = %guild_id,
-                                channel_id = %channel_id,
-                                is_thread = is_thread,
-                                "Channel type resolved from cache (guild search)"
-                            );
-                            is_thread
-                        })
-                })
-            })
-        }; // Cache references are dropped here
+        }); // Cache references are dropped here
 
         // Return cached result if available
         if let Some(is_thread) = cached_result {
