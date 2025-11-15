@@ -69,9 +69,10 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
 | Message | `MESSAGE_DIRECT` | `MESSAGE_GUILD` | New message created |
 | Message Delete | `MESSAGE_DELETE_DIRECT` | `MESSAGE_DELETE_GUILD` | Single message deleted |
 | Message Delete Bulk | - | `MESSAGE_DELETE_BULK_GUILD` | Multiple messages deleted at once (guild only) |
+| Message Update | `MESSAGE_UPDATE_DIRECT` | `MESSAGE_UPDATE_GUILD` | Message edited/updated |
 | Ready | - | `READY` | Bot connected to Discord |
 
-*More events coming soon: MESSAGE_UPDATE, REACTION_ADD, etc.*
+*More events coming soon: REACTION_ADD, REACTION_REMOVE, etc.*
 
 #### Configuration Examples
 
@@ -331,6 +332,51 @@ The request body contains multiple message IDs:
 
 **Note:** Bulk delete only occurs in guilds (not DMs) when using Discord's bulk delete API. The same limitations as single delete apply - no content available.
 
+### Message Update Event Payload
+
+When a message is edited or updated (if `MESSAGE_UPDATE_DIRECT` or `MESSAGE_UPDATE_GUILD` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=message_update
+```
+
+The request body contains the updated message data:
+
+```json
+{
+  "message_update": {
+    "id": "1234567890123456789",
+    "channel_id": "9876543210987654321",
+    "guild_id": "1111111111111111111",
+    "content": "Updated content here",
+    "edited_timestamp": "2024-01-15T12:35:00.789Z",
+    "attachments": [],
+    "embeds": []
+  }
+}
+```
+
+**Note:** The `guild_id` field is null for direct messages.
+
+**Important limitations:**
+- Discord only provides **changed fields** in the update event, along with always-present fields (`id`, `channel_id`, `guild_id`)
+- If only content was edited, fields like `author` may not be included
+- Message filtering (by sender type) is not available for update events
+- Webhook response actions are not supported for update events
+- To get complete message data, you need to cache messages when they're created
+
+**Common updated fields:**
+- `content` - Message text (if edited)
+- `edited_timestamp` - Timestamp of the edit
+- `embeds` - Embed objects (if added/removed/changed)
+- `attachments` - Attachment objects (if added/removed)
+- `pinned` - Whether message is pinned (if changed)
+
+**Use cases:**
+- Content moderation (track edited messages)
+- Audit logging (who edited what and when)
+- Spam detection (rapid edit patterns)
+
 ## Webhook Response Actions
 
 Your HTTP endpoint can respond with actions for gatehook to execute on Discord. This enables bidirectional communication - your webhook receives events and can instruct gatehook to reply, react, or perform other Discord operations.
@@ -540,16 +586,16 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 
 - **GUILD_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_GUILD`
-  - [ ] `MESSAGE_UPDATE`
+  - [x] `MESSAGE_UPDATE` via `MESSAGE_UPDATE_GUILD`
   - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_GUILD`
   - [x] `MESSAGE_DELETE_BULK` via `MESSAGE_DELETE_BULK_GUILD`
 - **DIRECT_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_DIRECT`
-  - [ ] `MESSAGE_UPDATE`
+  - [x] `MESSAGE_UPDATE` via `MESSAGE_UPDATE_DIRECT`
   - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_DIRECT`
   - [ ] `CHANNEL_PINS_UPDATE`
-- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE)*
-  - Automatically enabled when MESSAGE_DIRECT or MESSAGE_GUILD is configured
+- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE or MESSAGE_UPDATE)*
+  - Automatically enabled when MESSAGE_DIRECT, MESSAGE_GUILD, MESSAGE_UPDATE_DIRECT, or MESSAGE_UPDATE_GUILD is configured
   - Not required for MESSAGE_DELETE events (only IDs available, no content)
 - **GUILD_MESSAGE_REACTIONS**
   - [ ] `MESSAGE_REACTION_ADD`
