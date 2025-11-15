@@ -67,9 +67,9 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
 | Event | Direct Variable | Guild Variable | Description |
 |-------|----------------|----------------|-------------|
 | Message | `MESSAGE_DIRECT` | `MESSAGE_GUILD` | New message created |
+| Message Update | `MESSAGE_UPDATE_DIRECT` | `MESSAGE_UPDATE_GUILD` | Message edited/updated |
 | Message Delete | `MESSAGE_DELETE_DIRECT` | `MESSAGE_DELETE_GUILD` | Single message deleted |
 | Message Delete Bulk | - | `MESSAGE_DELETE_BULK_GUILD` | Multiple messages deleted at once (guild only) |
-| Message Update | `MESSAGE_UPDATE_DIRECT` | `MESSAGE_UPDATE_GUILD` | Message edited/updated |
 | Ready | - | `READY` | Bot connected to Discord |
 
 *More events coming soon: REACTION_ADD, REACTION_REMOVE, etc.*
@@ -226,52 +226,50 @@ def is_in_thread(payload):
     return channel_type in [10, 11, 12]
 ```
 
-### Ready Event Payload
+### Message Update Event Payload
 
-When the bot connects to Discord (if `READY` is enabled), a ready event is sent:
+When a message is edited or updated (if `MESSAGE_UPDATE_DIRECT` or `MESSAGE_UPDATE_GUILD` is enabled):
 
 ```
-POST {HTTP_ENDPOINT}?handler=ready
+POST {HTTP_ENDPOINT}?handler=message_update
 ```
 
-The request body contains the ready data wrapped in a `ready` key:
+The request body contains the updated message data:
 
 ```json
 {
-  "ready": {
-    "v": 10,
-    "user": {
-      "id": "123456789012345678",
-      "username": "MyBot",
-      "discriminator": "0",
-      "avatar": "...",
-      "bot": true
-    },
-    "guilds": [
-      {
-        "id": "987654321098765432",
-        "unavailable": false
-      }
-    ],
-    "session_id": "...",
-    "resume_gateway_url": "...",
-    "shard": [0, 1],
-    "application": {
-      "id": "123456789012345678",
-      "flags": 0
-    }
-    // ... other Discord Ready fields ...
+  "message_update": {
+    "id": "1234567890123456789",
+    "channel_id": "9876543210987654321",
+    "guild_id": "1111111111111111111",
+    "content": "Updated content here",
+    "edited_timestamp": "2024-01-15T12:35:00.789Z",
+    "attachments": [],
+    "embeds": []
   }
 }
 ```
 
-**Ready event fields** (from Discord's [Ready](https://discord.com/developers/docs/topics/gateway-events#ready) event):
-- `v` - Gateway version
-- `user` - Bot user information
-- `guilds` - Guilds the bot is in (may be unavailable during initial connection)
-- `session_id` - Session ID for resuming
-- `shard` - Shard information (if sharding is used)
-- `application` - Application information
+**Note:** The `guild_id` field is null for direct messages.
+
+**Important limitations:**
+- Discord only provides **changed fields** in the update event, along with always-present fields (`id`, `channel_id`, `guild_id`)
+- If only content was edited, fields like `author` may not be included
+- Message filtering (by sender type) is not available for update events
+- Webhook response actions are not supported for update events
+- To get complete message data, you need to cache messages when they're created
+
+**Common updated fields:**
+- `content` - Message text (if edited)
+- `edited_timestamp` - Timestamp of the edit
+- `embeds` - Embed objects (if added/removed/changed)
+- `attachments` - Attachment objects (if added/removed)
+- `pinned` - Whether message is pinned (if changed)
+
+**Use cases:**
+- Content moderation (track edited messages)
+- Audit logging (who edited what and when)
+- Spam detection (rapid edit patterns)
 
 ### Message Delete Event Payload
 
@@ -332,50 +330,52 @@ The request body contains multiple message IDs:
 
 **Note:** Bulk delete only occurs in guilds (not DMs) when using Discord's bulk delete API. The same limitations as single delete apply - no content available.
 
-### Message Update Event Payload
+### Ready Event Payload
 
-When a message is edited or updated (if `MESSAGE_UPDATE_DIRECT` or `MESSAGE_UPDATE_GUILD` is enabled):
+When the bot connects to Discord (if `READY` is enabled), a ready event is sent:
 
 ```
-POST {HTTP_ENDPOINT}?handler=message_update
+POST {HTTP_ENDPOINT}?handler=ready
 ```
 
-The request body contains the updated message data:
+The request body contains the ready data wrapped in a `ready` key:
 
 ```json
 {
-  "message_update": {
-    "id": "1234567890123456789",
-    "channel_id": "9876543210987654321",
-    "guild_id": "1111111111111111111",
-    "content": "Updated content here",
-    "edited_timestamp": "2024-01-15T12:35:00.789Z",
-    "attachments": [],
-    "embeds": []
+  "ready": {
+    "v": 10,
+    "user": {
+      "id": "123456789012345678",
+      "username": "MyBot",
+      "discriminator": "0",
+      "avatar": "...",
+      "bot": true
+    },
+    "guilds": [
+      {
+        "id": "987654321098765432",
+        "unavailable": false
+      }
+    ],
+    "session_id": "...",
+    "resume_gateway_url": "...",
+    "shard": [0, 1],
+    "application": {
+      "id": "123456789012345678",
+      "flags": 0
+    }
+    // ... other Discord Ready fields ...
   }
 }
 ```
 
-**Note:** The `guild_id` field is null for direct messages.
-
-**Important limitations:**
-- Discord only provides **changed fields** in the update event, along with always-present fields (`id`, `channel_id`, `guild_id`)
-- If only content was edited, fields like `author` may not be included
-- Message filtering (by sender type) is not available for update events
-- Webhook response actions are not supported for update events
-- To get complete message data, you need to cache messages when they're created
-
-**Common updated fields:**
-- `content` - Message text (if edited)
-- `edited_timestamp` - Timestamp of the edit
-- `embeds` - Embed objects (if added/removed/changed)
-- `attachments` - Attachment objects (if added/removed)
-- `pinned` - Whether message is pinned (if changed)
-
-**Use cases:**
-- Content moderation (track edited messages)
-- Audit logging (who edited what and when)
-- Spam detection (rapid edit patterns)
+**Ready event fields** (from Discord's [Ready](https://discord.com/developers/docs/topics/gateway-events#ready) event):
+- `v` - Gateway version
+- `user` - Bot user information
+- `guilds` - Guilds the bot is in (may be unavailable during initial connection)
+- `session_id` - Session ID for resuming
+- `shard` - Shard information (if sharding is used)
+- `application` - Application information
 
 ## Webhook Response Actions
 
