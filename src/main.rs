@@ -11,6 +11,7 @@ use tracing::{error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
+use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
@@ -234,6 +235,44 @@ impl EventHandler for Handler {
             }
         }
     }
+
+    async fn message_update(
+        &self,
+        _ctx: Context,
+        _old_if_available: Option<Message>,
+        _new: Option<Message>,
+        event: MessageUpdateEvent,
+    ) {
+        // Check if event is enabled for this context
+        match event.guild_id {
+            None if self.params.message_update_direct.is_none() => return,
+            Some(_) if self.params.message_update_guild.is_none() => return,
+            _ => {}
+        }
+
+        // Get bridge
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
+        // Handle event
+        match bridge.handle_message_update(event).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                tracing::warn!(
+                    action_count = event_response.actions.len(),
+                    "MessageUpdate event received actions from webhook, \
+                     but action execution is not supported for update events"
+                );
+            }
+            Ok(_) => {
+                // Success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle message_update event");
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -282,28 +321,32 @@ async fn main() -> anyhow::Result<()> {
 fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
     let mut intents = GatewayIntents::empty();
 
-    // Direct Message events (MESSAGE and MESSAGE_DELETE)
-    if params.has_direct_message_events() || params.has_message_delete_events() {
+    // Direct Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_UPDATE)
+    if params.has_direct_message_events()
+        || params.has_message_delete_events()
+        || params.has_message_update_events()
+    {
         intents |= GatewayIntents::DIRECT_MESSAGES;
     }
 
-    // MESSAGE_CONTENT is only needed for MESSAGE events, not DELETE
-    if params.has_direct_message_events() {
+    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE
+    if params.has_direct_message_events() || params.has_message_update_events() {
         intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 
-    // Guild Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_DELETE_BULK)
+    // Guild Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_DELETE_BULK, MESSAGE_UPDATE)
     if params.has_guild_message_events()
         || params.has_message_delete_events()
         || params.has_message_delete_bulk_events()
+        || params.has_message_update_events()
     {
         intents |= GatewayIntents::GUILD_MESSAGES;
         // GUILDS intent is required for cache access (guild/channel data)
         intents |= GatewayIntents::GUILDS;
     }
 
-    // MESSAGE_CONTENT is only needed for MESSAGE events, not DELETE
-    if params.has_guild_message_events() {
+    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE
+    if params.has_guild_message_events() || params.has_message_update_events() {
         intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 

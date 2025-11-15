@@ -64,14 +64,49 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
 
 #### Available Events
 
-| Event | Direct Variable | Guild Variable | Description |
-|-------|----------------|----------------|-------------|
-| Message | `MESSAGE_DIRECT` | `MESSAGE_GUILD` | New message created |
-| Message Delete | `MESSAGE_DELETE_DIRECT` | `MESSAGE_DELETE_GUILD` | Single message deleted |
-| Message Delete Bulk | - | `MESSAGE_DELETE_BULK_GUILD` | Multiple messages deleted at once (guild only) |
-| Ready | - | `READY` | Bot connected to Discord |
+<table>
+  <thead>
+    <tr>
+      <th>Event</th>
+      <th>Direct Variable</th>
+      <th>Guild Variable</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ready</td>
+      <td colspan="2" align="center"><code>READY</code></td>
+      <td>Bot connected to Discord</td>
+    </tr>
+    <tr>
+      <td>Message</td>
+      <td><code>MESSAGE_DIRECT</code></td>
+      <td><code>MESSAGE_GUILD</code></td>
+      <td>New message created</td>
+    </tr>
+    <tr>
+      <td>Message Update</td>
+      <td><code>MESSAGE_UPDATE_DIRECT</code></td>
+      <td><code>MESSAGE_UPDATE_GUILD</code></td>
+      <td>Message edited/updated</td>
+    </tr>
+    <tr>
+      <td>Message Delete</td>
+      <td><code>MESSAGE_DELETE_DIRECT</code></td>
+      <td><code>MESSAGE_DELETE_GUILD</code></td>
+      <td>Single message deleted</td>
+    </tr>
+    <tr>
+      <td>Message Delete Bulk</td>
+      <td align="center">-</td>
+      <td><code>MESSAGE_DELETE_BULK_GUILD</code></td>
+      <td>Multiple messages deleted at once (guild only)</td>
+    </tr>
+  </tbody>
+</table>
 
-*More events coming soon: MESSAGE_UPDATE, REACTION_ADD, etc.*
+*More events coming soon: REACTION_ADD, REACTION_REMOVE, etc.*
 
 #### Configuration Examples
 
@@ -271,6 +306,51 @@ The request body contains the ready data wrapped in a `ready` key:
 - `session_id` - Session ID for resuming
 - `shard` - Shard information (if sharding is used)
 - `application` - Application information
+
+### Message Update Event Payload
+
+When a message is edited or updated (if `MESSAGE_UPDATE_DIRECT` or `MESSAGE_UPDATE_GUILD` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=message_update
+```
+
+The request body contains the updated message data:
+
+```json
+{
+  "message_update": {
+    "id": "1234567890123456789",
+    "channel_id": "9876543210987654321",
+    "guild_id": "1111111111111111111",
+    "content": "Updated content here",
+    "edited_timestamp": "2024-01-15T12:35:00.789Z",
+    "attachments": [],
+    "embeds": []
+  }
+}
+```
+
+**Note:** The `guild_id` field is null for direct messages.
+
+**Important limitations:**
+- Discord only provides **changed fields** in the update event, along with always-present fields (`id`, `channel_id`, `guild_id`)
+- If only content was edited, fields like `author` may not be included
+- Message filtering (by sender type) is not available for update events
+- Webhook response actions are not supported for update events
+- To get complete message data, you need to cache messages when they're created
+
+**Common updated fields:**
+- `content` - Message text (if edited)
+- `edited_timestamp` - Timestamp of the edit
+- `embeds` - Embed objects (if added/removed/changed)
+- `attachments` - Attachment objects (if added/removed)
+- `pinned` - Whether message is pinned (if changed)
+
+**Use cases:**
+- Content moderation (track edited messages)
+- Audit logging (who edited what and when)
+- Spam detection (rapid edit patterns)
 
 ### Message Delete Event Payload
 
@@ -540,16 +620,16 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 
 - **GUILD_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_GUILD`
-  - [ ] `MESSAGE_UPDATE`
+  - [x] `MESSAGE_UPDATE` via `MESSAGE_UPDATE_GUILD`
   - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_GUILD`
   - [x] `MESSAGE_DELETE_BULK` via `MESSAGE_DELETE_BULK_GUILD`
 - **DIRECT_MESSAGES** 🎯
   - [x] `MESSAGE_CREATE` via `MESSAGE_DIRECT`
-  - [ ] `MESSAGE_UPDATE`
+  - [x] `MESSAGE_UPDATE` via `MESSAGE_UPDATE_DIRECT`
   - [x] `MESSAGE_DELETE` via `MESSAGE_DELETE_DIRECT`
   - [ ] `CHANNEL_PINS_UPDATE`
-- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE)*
-  - Automatically enabled when MESSAGE_DIRECT or MESSAGE_GUILD is configured
+- **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE or MESSAGE_UPDATE)*
+  - Automatically enabled when MESSAGE_DIRECT, MESSAGE_GUILD, MESSAGE_UPDATE_DIRECT, or MESSAGE_UPDATE_GUILD is configured
   - Not required for MESSAGE_DELETE events (only IDs available, no content)
 - **GUILD_MESSAGE_REACTIONS**
   - [ ] `MESSAGE_REACTION_ADD`

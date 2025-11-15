@@ -6,9 +6,11 @@ use crate::bridge::discord_text::{generate_thread_name, truncate_content, trunca
 use crate::bridge::message_delete_bulk_payload::MessageDeleteBulkPayload;
 use crate::bridge::message_delete_payload::MessageDeletePayload;
 use crate::bridge::message_payload::MessagePayload;
+use crate::bridge::message_update_payload::MessageUpdatePayload;
 use crate::bridge::ready_payload::ReadyPayload;
 use anyhow::Context as _;
 use serenity::model::channel::Message;
+use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use std::sync::Arc;
@@ -381,5 +383,37 @@ where
             .send("message_delete_bulk", &payload)
             .await
             .context("Failed to send message_delete_bulk event to HTTP endpoint")
+    }
+
+    /// Handle a message_update event
+    ///
+    /// Sends event to webhook and returns the response.
+    /// Note: Discord only provides changed fields in MessageUpdateEvent.
+    /// Note: Actions are not supported for update events.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - The MessageUpdateEvent from Discord
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (actions are not supported for update events)
+    pub async fn handle_message_update(
+        &self,
+        event: MessageUpdateEvent,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            message_id = %event.id,
+            channel_id = %event.channel_id,
+            ?event.guild_id,
+            "Processing message_update event"
+        );
+
+        let payload = MessageUpdatePayload::new(event);
+
+        self.event_sender
+            .send("message_update", &payload)
+            .await
+            .context("Failed to send message_update event to HTTP endpoint")
     }
 }

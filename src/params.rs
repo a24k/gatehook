@@ -39,6 +39,12 @@ pub struct Params {
     #[serde(default)]
     pub message_delete_bulk_guild: Option<String>,
 
+    // Message Update Events
+    #[serde(default)]
+    pub message_update_direct: Option<String>,
+    #[serde(default)]
+    pub message_update_guild: Option<String>,
+
     // Context-Independent Events
     #[serde(default)]
     pub ready: Option<String>,
@@ -74,6 +80,8 @@ impl std::fmt::Debug for Params {
             .field("message_delete_direct", &self.message_delete_direct)
             .field("message_delete_guild", &self.message_delete_guild)
             .field("message_delete_bulk_guild", &self.message_delete_bulk_guild)
+            .field("message_update_direct", &self.message_update_direct)
+            .field("message_update_guild", &self.message_update_guild)
             .field("ready", &self.ready)
             .finish()
     }
@@ -103,6 +111,11 @@ impl Params {
     pub fn has_message_delete_bulk_events(&self) -> bool {
         self.message_delete_bulk_guild.is_some()
     }
+
+    /// Check if any MESSAGE_UPDATE events are enabled
+    pub fn has_message_update_events(&self) -> bool {
+        self.message_update_direct.is_some() || self.message_update_guild.is_some()
+    }
 }
 
 #[cfg(test)]
@@ -130,6 +143,8 @@ mod tests {
             message_delete_direct: None,
             message_delete_guild: None,
             message_delete_bulk_guild: None,
+            message_update_direct: None,
+            message_update_guild: None,
             ready: None,
         };
 
