@@ -64,13 +64,47 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
 
 #### Available Events
 
-| Event | Direct Variable | Guild Variable | Description |
-|-------|----------------|----------------|-------------|
-| Ready | - | `READY` | Bot connected to Discord |
-| Message | `MESSAGE_DIRECT` | `MESSAGE_GUILD` | New message created |
-| Message Update | `MESSAGE_UPDATE_DIRECT` | `MESSAGE_UPDATE_GUILD` | Message edited/updated |
-| Message Delete | `MESSAGE_DELETE_DIRECT` | `MESSAGE_DELETE_GUILD` | Single message deleted |
-| Message Delete Bulk | - | `MESSAGE_DELETE_BULK_GUILD` | Multiple messages deleted at once (guild only) |
+<table>
+  <thead>
+    <tr>
+      <th>Event</th>
+      <th>Direct Variable</th>
+      <th>Guild Variable</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ready</td>
+      <td colspan="2" align="center"><code>READY</code></td>
+      <td>Bot connected to Discord</td>
+    </tr>
+    <tr>
+      <td>Message</td>
+      <td><code>MESSAGE_DIRECT</code></td>
+      <td><code>MESSAGE_GUILD</code></td>
+      <td>New message created</td>
+    </tr>
+    <tr>
+      <td>Message Update</td>
+      <td><code>MESSAGE_UPDATE_DIRECT</code></td>
+      <td><code>MESSAGE_UPDATE_GUILD</code></td>
+      <td>Message edited/updated</td>
+    </tr>
+    <tr>
+      <td>Message Delete</td>
+      <td><code>MESSAGE_DELETE_DIRECT</code></td>
+      <td><code>MESSAGE_DELETE_GUILD</code></td>
+      <td>Single message deleted</td>
+    </tr>
+    <tr>
+      <td>Message Delete Bulk</td>
+      <td align="center">-</td>
+      <td><code>MESSAGE_DELETE_BULK_GUILD</code></td>
+      <td>Multiple messages deleted at once (guild only)</td>
+    </tr>
+  </tbody>
+</table>
 
 *More events coming soon: REACTION_ADD, REACTION_REMOVE, etc.*
 
