@@ -5,12 +5,12 @@ mod params;
 use anyhow::Context as _;
 use adapters::{HttpEventSender, SerenityChannelInfoProvider, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
-use bridge::sender_filter::MessageFilter;
+use bridge::sender_filter::{MessageFilter, ReactionFilter};
 use std::sync::Arc;
 use tracing::{error, info};
 
 use serenity::async_trait;
-use serenity::model::channel::Message;
+use serenity::model::channel::{Message, Reaction};
 use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
@@ -22,6 +22,8 @@ struct Handler {
     // Active filters initialized in ready event
     message_direct_filter: std::sync::OnceLock<MessageFilter>,
     message_guild_filter: std::sync::OnceLock<MessageFilter>,
+    reaction_add_direct_filter: std::sync::OnceLock<ReactionFilter>,
+    reaction_add_guild_filter: std::sync::OnceLock<ReactionFilter>,
 }
 
 impl Handler {
@@ -31,6 +33,8 @@ impl Handler {
             params: Arc::new(params.clone()),
             message_direct_filter: std::sync::OnceLock::new(),
             message_guild_filter: std::sync::OnceLock::new(),
+            reaction_add_direct_filter: std::sync::OnceLock::new(),
+            reaction_add_guild_filter: std::sync::OnceLock::new(),
         })
     }
 }
@@ -68,6 +72,16 @@ impl EventHandler for Handler {
             let _ = self
                 .message_guild_filter
                 .set(policy.for_user(current_user_id));
+        }
+        if let Some(policy) = &self.params.reaction_add_direct {
+            let _ = self
+                .reaction_add_direct_filter
+                .set(policy.for_reaction(current_user_id));
+        }
+        if let Some(policy) = &self.params.reaction_add_guild {
+            let _ = self
+                .reaction_add_guild_filter
+                .set(policy.for_reaction(current_user_id));
         }
 
         info!(
@@ -273,6 +287,47 @@ impl EventHandler for Handler {
             }
         }
     }
+
+    async fn reaction_add(&self, _ctx: Context, reaction: Reaction) {
+        // Determine filter based on context (DM vs Guild)
+        let filter = match reaction.guild_id {
+            None => self.reaction_add_direct_filter.get(),
+            Some(_) => self.reaction_add_guild_filter.get(),
+        };
+
+        // Check if event is enabled and filter passes
+        let Some(filter) = filter else {
+            return; // Event not enabled for this context
+        };
+        if !filter.should_process(&reaction) {
+            return; // Filtered out
+        }
+
+        // Get bridge (should be initialized by ready event)
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
+        // Handle event (send to webhook + execute actions)
+        match bridge.handle_reaction_add(&reaction).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                // Execute actions if webhook responded with any
+                if let Err(err) = bridge
+                    .execute_actions(&reaction, &event_response)
+                    .await
+                {
+                    error!(?err, "Failed to execute actions from webhook response");
+                }
+            }
+            Ok(_) => {
+                // No response or empty actions - success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle reaction_add event");
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -321,33 +376,45 @@ async fn main() -> anyhow::Result<()> {
 fn build_gateway_intents(params: &params::Params) -> GatewayIntents {
     let mut intents = GatewayIntents::empty();
 
-    // Direct Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_UPDATE)
+    // Direct Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_UPDATE, REACTION_ADD)
     if params.has_direct_message_events()
         || params.has_message_delete_events()
         || params.has_message_update_events()
+        || params.has_direct_reaction_add_events()
     {
         intents |= GatewayIntents::DIRECT_MESSAGES;
     }
 
-    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE
+    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE or REACTION_ADD
     if params.has_direct_message_events() || params.has_message_update_events() {
         intents |= GatewayIntents::MESSAGE_CONTENT;
     }
 
-    // Guild Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_DELETE_BULK, MESSAGE_UPDATE)
+    // Direct Message Reactions
+    if params.has_direct_reaction_add_events() {
+        intents |= GatewayIntents::DIRECT_MESSAGE_REACTIONS;
+    }
+
+    // Guild Message events (MESSAGE, MESSAGE_DELETE, MESSAGE_DELETE_BULK, MESSAGE_UPDATE, REACTION_ADD)
     if params.has_guild_message_events()
         || params.has_message_delete_events()
         || params.has_message_delete_bulk_events()
         || params.has_message_update_events()
+        || params.has_guild_reaction_add_events()
     {
         intents |= GatewayIntents::GUILD_MESSAGES;
         // GUILDS intent is required for cache access (guild/channel data)
         intents |= GatewayIntents::GUILDS;
     }
 
-    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE
+    // MESSAGE_CONTENT is needed for MESSAGE and MESSAGE_UPDATE events, not DELETE or REACTION_ADD
     if params.has_guild_message_events() || params.has_message_update_events() {
         intents |= GatewayIntents::MESSAGE_CONTENT;
+    }
+
+    // Guild Message Reactions
+    if params.has_guild_reaction_add_events() {
+        intents |= GatewayIntents::GUILD_MESSAGE_REACTIONS;
     }
 
     intents

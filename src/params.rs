@@ -163,6 +163,8 @@ mod tests {
             message_delete_bulk_guild: None,
             message_update_direct: None,
             message_update_guild: None,
+            reaction_add_direct: None,
+            reaction_add_guild: None,
             ready: None,
         };
 
