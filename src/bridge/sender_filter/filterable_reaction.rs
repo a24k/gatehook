@@ -19,7 +19,7 @@ impl FilterableReaction for serenity::model::channel::Reaction {
 
     fn is_bot(&self) -> bool {
         self.member.as_ref()
-            .and_then(|m| Some(m.user.bot))
+            .map(|m| m.user.bot)
             .unwrap_or(false)
     }
 }
