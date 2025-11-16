@@ -3,7 +3,7 @@
 
 mod adapters;
 
-use adapters::{MockChannelInfoProvider, MockDiscordService, MockEventSender};
+use adapters::{MockChannelInfoProvider, MockDiscordService, MockEventSender, MockReactionBuilder};
 use gatehook::adapters::{ReactParams, ReplyParams, ThreadParams};
 use gatehook::bridge::event_bridge::EventBridge;
 use rstest::rstest;
@@ -716,4 +716,186 @@ async fn test_handle_message_delete_bulk_empty() {
         .as_array()
         .expect("ids should be an array");
     assert_eq!(ids.len(), 0, "Should have empty ids array");
+}
+
+// ========================================
+// REACTION_ADD Event Tests
+// ========================================
+
+#[tokio::test]
+async fn test_handle_reaction_add_with_channel_info() {
+    use serenity::model::channel::{ChannelType, GuildChannel};
+
+    // Setup: MockChannelInfoProvider with pre-configured channel
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+
+    // Create a guild channel with specific properties
+    let mut test_channel = GuildChannel::default();
+    test_channel.id = ChannelId::new(2000);
+    test_channel.name = "reaction-channel".to_string();
+    test_channel.kind = ChannelType::Text;
+    test_channel.guild_id = GuildId::new(6000);
+
+    // Configure mock to return this channel
+    channel_info.set_channel(ChannelId::new(2000), test_channel.clone());
+
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let reaction = MockReactionBuilder::new(2222, 2000)
+        .emoji("👍")
+        .guild(6000, 1111)
+        .build();
+
+    // Execute handle_reaction_add
+    let result = bridge.handle_reaction_add(&reaction).await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook with channel information
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(sent_events[0].handler, "reaction_add");
+
+    // Verify that the payload contains channel information
+    let payload_json = &sent_events[0].payload;
+    assert!(
+        payload_json.contains("reaction-channel"),
+        "Payload should contain channel name"
+    );
+    assert!(
+        payload_json.contains("\"channel\""),
+        "Payload should contain channel field"
+    );
+}
+
+#[tokio::test]
+async fn test_handle_reaction_add_without_channel_info() {
+    // Setup: MockChannelInfoProvider without pre-configured channel (simulates cache miss + API failure)
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let reaction = MockReactionBuilder::new(2222, 2000)
+        .emoji("👍")
+        .guild(6000, 1111)
+        .build();
+
+    // Execute handle_reaction_add
+    let result = bridge.handle_reaction_add(&reaction).await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(sent_events[0].handler, "reaction_add");
+
+    // Verify that the payload does NOT contain channel information
+    // (MockChannelInfoProvider returns None if channel not set)
+    let payload_json = &sent_events[0].payload;
+    // The JSON should not have a "channel" field when it's None
+    // (due to #[serde(skip_serializing_if = "Option::is_none")])
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+    assert!(
+        json_value.get("channel").is_none(),
+        "Payload should not contain channel field when channel info is unavailable"
+    );
+}
+
+#[tokio::test]
+async fn test_handle_reaction_add_dm() {
+    // Setup for DM reaction (no guild_id)
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+
+    let reaction = MockReactionBuilder::new(4444, 5000)
+        .emoji("❤️")
+        .user_id(3333)
+        .build();
+
+    // Execute handle_reaction_add
+    let result = bridge.handle_reaction_add(&reaction).await;
+
+    // Verify
+    assert!(result.is_ok());
+
+    // Check that the event was sent to webhook
+    let sent_events = event_sender.get_sent_events();
+    assert_eq!(sent_events.len(), 1, "Should send one event to webhook");
+    assert_eq!(sent_events[0].handler, "reaction_add");
+
+    // Verify payload structure (DM reaction should not have channel field)
+    let payload_json = &sent_events[0].payload;
+    let json_value: serde_json::Value = serde_json::from_str(payload_json).unwrap();
+
+    assert!(
+        json_value.get("reaction").is_some(),
+        "Payload should contain reaction field"
+    );
+    assert!(
+        json_value.get("channel").is_none(),
+        "DM reaction should not have channel field"
+    );
+    assert!(
+        json_value["reaction"]["guild_id"].is_null(),
+        "DM reaction should have null guild_id"
+    );
+}
+
+#[tokio::test]
+async fn test_execute_actions_from_reaction() {
+    use gatehook::adapters::{EventResponse, ResponseAction};
+
+    // Setup
+    let discord_service = Arc::new(MockDiscordService::new());
+    let event_sender = Arc::new(MockEventSender::new());
+    let channel_info = Arc::new(MockChannelInfoProvider::new());
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+
+    let reaction = MockReactionBuilder::new(8888, 9999)
+        .emoji("🎉")
+        .guild(1234, 7777)
+        .build();
+
+    // Create EventResponse with reply and react actions
+    let event_response = EventResponse {
+        actions: vec![
+            ResponseAction::Reply(ReplyParams {
+                content: "Thanks for the reaction!".to_string(),
+                mention: false,
+            }),
+            ResponseAction::React(ReactParams {
+                emoji: "✅".to_string(),
+            }),
+        ],
+    };
+
+    // Execute actions from reaction event
+    let result = bridge.execute_actions(&reaction, &event_response).await;
+
+    // Verify
+    assert!(result.is_ok(), "execute_actions should succeed");
+
+    // Verify reply was sent to the original message
+    let replies = discord_service.get_replies();
+    assert_eq!(replies.len(), 1, "Should send one reply");
+    assert_eq!(replies[0].content, "Thanks for the reaction!");
+    assert_eq!(replies[0].message_id, MessageId::new(8888)); // reaction.message_id
+    assert_eq!(replies[0].channel_id, ChannelId::new(9999)); // reaction.channel_id
+
+    // Verify reaction was added to the original message
+    let reactions = discord_service.get_reactions();
+    assert_eq!(reactions.len(), 1, "Should add one reaction");
+    assert_eq!(reactions[0].emoji, "✅");
+    assert_eq!(reactions[0].message_id, MessageId::new(8888));
+    assert_eq!(reactions[0].channel_id, ChannelId::new(9999));
 }
