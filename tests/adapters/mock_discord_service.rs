@@ -148,6 +148,16 @@ impl DiscordService for MockDiscordService {
         // Return a dummy Message
         Ok(create_dummy_message(channel_id, content))
     }
+
+    async fn get_message(
+        &self,
+        channel_id: ChannelId,
+        _message_id: MessageId,
+    ) -> Result<Message, serenity::Error> {
+        // Return a dummy message for testing
+        // In real scenarios, this would retrieve from Discord API
+        Ok(create_dummy_message(channel_id, "Mock message"))
+    }
 }
 
 // Helper function to create dummy GuildChannel for testing

@@ -65,4 +65,16 @@ pub trait DiscordService: Send + Sync {
         content: &str,
         mention: bool,
     ) -> Result<Message, serenity::Error>;
+
+    /// Get a message by ID
+    ///
+    /// # Arguments
+    ///
+    /// * `channel_id` - The channel where the message is located
+    /// * `message_id` - The message to retrieve
+    async fn get_message(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+    ) -> Result<Message, serenity::Error>;
 }
