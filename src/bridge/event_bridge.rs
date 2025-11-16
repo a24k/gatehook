@@ -262,7 +262,7 @@ where
         // Check if already in thread (cache-first with API fallback)
         // Note: This will fail for DM channels (threads not supported)
         let is_in_thread = self.channel_info
-            .is_thread(target.channel_id)
+            .is_thread(target.guild_id, target.channel_id)
             .await
             .context("Failed to check if channel is thread (threads not supported in DM)")?;
 

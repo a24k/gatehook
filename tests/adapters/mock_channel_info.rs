@@ -57,6 +57,7 @@ impl Default for MockChannelInfoProvider {
 impl ChannelInfoProvider for MockChannelInfoProvider {
     async fn is_thread(
         &self,
+        _guild_id: Option<GuildId>,
         channel_id: ChannelId,
     ) -> Result<bool, serenity::Error> {
         // Check for configured error first

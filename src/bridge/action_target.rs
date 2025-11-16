@@ -1,15 +1,21 @@
 use serenity::model::channel::Message;
-use serenity::model::id::{ChannelId, MessageId};
+use serenity::model::id::{ChannelId, GuildId, MessageId};
 
 /// Target for webhook response actions.
 ///
 /// Represents the minimal information needed to execute Discord actions
 /// (reply, react, thread) on a message. This abstraction allows different
 /// event types (Message, Reaction, etc.) to be used as action targets.
+///
+/// The `guild_id` field enables:
+/// - Performance optimization (O(1) cache lookups)
+/// - Future guild-specific actions (roles, permissions, etc.)
+/// - Clear DM vs Guild context distinction
 #[derive(Debug, Clone, Copy)]
 pub struct ActionTarget {
     pub message_id: MessageId,
     pub channel_id: ChannelId,
+    pub guild_id: Option<GuildId>,
 }
 
 #[cfg(test)]
@@ -19,6 +25,7 @@ impl ActionTarget {
         Self {
             message_id,
             channel_id,
+            guild_id: None,
         }
     }
 }
@@ -29,6 +36,7 @@ impl From<&Message> for ActionTarget {
         Self {
             message_id: message.id,
             channel_id: message.channel_id,
+            guild_id: message.guild_id,
         }
     }
 }
