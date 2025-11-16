@@ -5,7 +5,7 @@ mod params;
 use anyhow::Context as _;
 use adapters::{HttpEventSender, SerenityChannelInfoProvider, SerenityDiscordService};
 use bridge::event_bridge::EventBridge;
-use bridge::message_filter::MessageFilter;
+use bridge::sender_filter::MessageFilter;
 use std::sync::Arc;
 use tracing::{error, info};
 

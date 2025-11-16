@@ -1,23 +1,23 @@
 use serenity::model::id::UserId;
 
 use super::filterable_message::FilterableMessage;
-use super::policy::MessageFilterPolicy;
+use super::policy::SenderFilterPolicy;
 
 /// Active message filter with bot's user ID
 ///
 /// This is created after the bot connects to Discord and knows its user ID.
-/// Can only be created via `MessageFilterPolicy::for_user()`.
+/// Can only be created via `SenderFilterPolicy::for_user()`.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
     user_id: UserId,
-    policy: MessageFilterPolicy,
+    policy: SenderFilterPolicy,
 }
 
 impl MessageFilter {
     /// Create a new MessageFilter (private constructor)
     ///
-    /// This is intentionally not public. Use `MessageFilterPolicy::for_user()` instead.
-    pub(super) fn new(user_id: UserId, policy: MessageFilterPolicy) -> Self {
+    /// This is intentionally not public. Use `SenderFilterPolicy::for_user()` instead.
+    pub(super) fn new(user_id: UserId, policy: SenderFilterPolicy) -> Self {
         Self {
             user_id,
             policy,
@@ -69,7 +69,7 @@ impl MessageFilter {
 mod tests {
     use super::*;
     use super::super::tests::MockMessage;
-    use crate::bridge::message_filter::policy::MessageFilterPolicy;
+    use crate::bridge::sender_filter::policy::SenderFilterPolicy;
     use rstest::rstest;
 
     // Helper function to create message for each sender type
@@ -105,7 +105,7 @@ mod tests {
         #[case] policy_str: &str,
         #[case] should_allow: bool,
     ) {
-        let policy = MessageFilterPolicy::from_policy(policy_str);
+        let policy = SenderFilterPolicy::from_policy(policy_str);
         let filter = policy.for_user(UserId::new(123));
         let message = create_message(sender_type, 123);
 
@@ -133,7 +133,7 @@ mod tests {
         #[case] lower_priority_policy: &str,
         #[case] description: &str,
     ) {
-        let policy = MessageFilterPolicy::from_policy(lower_priority_policy);
+        let policy = SenderFilterPolicy::from_policy(lower_priority_policy);
         let filter = policy.for_user(UserId::new(123));
 
         assert!(
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_default_policy_blocks_self_allows_others() {
-        let policy = MessageFilterPolicy::default();
+        let policy = SenderFilterPolicy::default();
         let filter = policy.for_user(UserId::new(123));
 
         assert!(
@@ -172,8 +172,8 @@ mod tests {
 
     #[test]
     fn test_empty_policy_same_as_default() {
-        let empty_policy = MessageFilterPolicy::from_policy("");
-        let default_policy = MessageFilterPolicy::default();
+        let empty_policy = SenderFilterPolicy::from_policy("");
+        let default_policy = SenderFilterPolicy::default();
         let filter_empty = empty_policy.for_user(UserId::new(123));
         let filter_default = default_policy.for_user(UserId::new(123));
 

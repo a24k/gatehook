@@ -1,16 +1,16 @@
 use anyhow::Context as _;
 use serde::Deserialize;
-use crate::bridge::message_filter::MessageFilterPolicy;
+use crate::bridge::sender_filter::SenderFilterPolicy;
 
-/// Deserialize environment variable string into MessageFilterPolicy
-fn deserialize_message_filter_policy<'de, D>(
+/// Deserialize environment variable string into SenderFilterPolicy
+fn deserialize_sender_filter_policy<'de, D>(
     deserializer: D,
-) -> Result<Option<MessageFilterPolicy>, D::Error>
+) -> Result<Option<SenderFilterPolicy>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s: Option<String> = Option::deserialize(deserializer)?;
-    Ok(s.map(|policy| MessageFilterPolicy::from_policy(&policy)))
+    Ok(s.map(|policy| SenderFilterPolicy::from_policy(&policy)))
 }
 
 #[derive(Deserialize, Clone)]
@@ -24,12 +24,12 @@ pub struct Params {
     // Event Configuration
     // ========================================
     // Direct Message Events
-    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
-    pub message_direct: Option<MessageFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub message_direct: Option<SenderFilterPolicy>,
 
     // Guild Events
-    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
-    pub message_guild: Option<MessageFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub message_guild: Option<SenderFilterPolicy>,
 
     // Message Delete Events
     #[serde(default)]
