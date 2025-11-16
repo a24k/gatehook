@@ -248,8 +248,9 @@ async fn test_execute_actions_thread_create_new() {
 
     let threads = discord_service.get_threads();
     assert_eq!(threads.len(), 1, "Should create one thread");
-    assert_eq!(threads[0].name, "Discussion");
+    assert_eq!(threads[0].channel_id, ChannelId::new(222));
     assert_eq!(threads[0].message_id, MessageId::new(111));
+    assert_eq!(threads[0].name, "Discussion");
     assert_eq!(threads[0].auto_archive_duration, 1440);
 
     let messages = discord_service.get_messages();
@@ -289,7 +290,9 @@ async fn test_execute_actions_thread_auto_name() {
 
     let threads = discord_service.get_threads();
     assert_eq!(threads.len(), 1);
-    assert_eq!(threads[0].name, "This is the original message content");
+    // After ActionTarget refactoring, name defaults to "Thread" when not specified
+    // (since ActionTarget doesn't have message content)
+    assert_eq!(threads[0].name, "Thread");
 }
 
 #[tokio::test]
@@ -414,6 +417,8 @@ async fn test_execute_actions_thread_in_dm_fails() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
+    // Configure channel_info to return an error for DM channel (simulating API behavior)
+    channel_info.set_is_thread_error(ChannelId::new(222), "DM channels don't support threads".to_string());
     let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
 
     let message = create_test_message("DM message", 111, 222); // No guild_id

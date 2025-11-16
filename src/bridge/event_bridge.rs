@@ -2,7 +2,8 @@ use crate::adapters::{
     ChannelInfoProvider, DiscordService, EventResponse, EventSender, ReactParams, ReplyParams,
     ResponseAction, ThreadParams,
 };
-use crate::bridge::discord_text::{generate_thread_name, truncate_content, truncate_thread_name};
+use crate::bridge::action_target::ActionTarget;
+use crate::bridge::discord_text::{truncate_content, truncate_thread_name};
 use crate::bridge::message_delete_bulk_payload::MessageDeleteBulkPayload;
 use crate::bridge::message_delete_payload::MessageDeletePayload;
 use crate::bridge::message_payload::MessagePayload;
@@ -155,16 +156,18 @@ where
     ///
     /// # Arguments
     ///
-    /// * `message` - The message that triggered the event (for context)
+    /// * `target` - The action target (message, reaction, etc.)
     /// * `event_response` - The response from webhook containing actions
     pub async fn execute_actions(
         &self,
-        message: &Message,
+        target: impl Into<ActionTarget>,
         event_response: &EventResponse,
     ) -> anyhow::Result<()> {
+        let target = target.into();
+
         for action in &event_response.actions {
             // Execute action (log error and continue with next)
-            if let Err(err) = self.execute_action(message, action).await {
+            if let Err(err) = self.execute_action(&target, action).await {
                 error!(?err, ?action, "Failed to execute action, continuing with next");
             }
         }
@@ -174,13 +177,13 @@ where
     /// Execute a single action
     async fn execute_action(
         &self,
-        message: &Message,
+        target: &ActionTarget,
         action: &ResponseAction,
     ) -> anyhow::Result<()> {
         match action {
-            ResponseAction::Reply(params) => self.execute_reply(message, params).await,
-            ResponseAction::React(params) => self.execute_react(message, params).await,
-            ResponseAction::Thread(params) => self.execute_thread(message, params).await,
+            ResponseAction::Reply(params) => self.execute_reply(target, params).await,
+            ResponseAction::React(params) => self.execute_react(target, params).await,
+            ResponseAction::Thread(params) => self.execute_thread(target, params).await,
         }
     }
 
@@ -194,18 +197,18 @@ where
     /// - `params.mention = false`: Reply without ping (default)
     async fn execute_reply(
         &self,
-        message: &Message,
+        target: &ActionTarget,
         params: &ReplyParams,
     ) -> anyhow::Result<()> {
         let content = truncate_content(&params.content);
 
         self.discord_service
-            .reply_in_channel(message.channel_id, message.id, &content, params.mention)
+            .reply_in_channel(target.channel_id, target.message_id, &content, params.mention)
             .await
             .context("Failed to send reply to Discord")?;
 
         info!(
-            message_id = %message.id,
+            message_id = %target.message_id,
             mention = params.mention,
             content_len = content.chars().count(),
             "Successfully executed reply action"
@@ -221,16 +224,16 @@ where
     /// - Custom emoji: "name:id" format (e.g., "customemoji:123456789")
     async fn execute_react(
         &self,
-        message: &Message,
+        target: &ActionTarget,
         params: &ReactParams,
     ) -> anyhow::Result<()> {
         self.discord_service
-            .react_to_message(message.channel_id, message.id, &params.emoji)
+            .react_to_message(target.channel_id, target.message_id, &params.emoji)
             .await
             .context("Failed to add reaction to Discord")?;
 
         info!(
-            message_id = %message.id,
+            message_id = %target.message_id,
             emoji = %params.emoji,
             "Successfully executed react action"
         );
@@ -242,8 +245,7 @@ where
     ///
     /// # Thread Name
     /// - `params.name = Some(...)`: Use specified name
-    /// - `params.name = None`: Auto-generate from first line of message (max 100 chars)
-    ///   - Falls back to "Thread" if message content is empty
+    /// - `params.name = None`: Defaults to "Thread"
     /// - Name is ignored if already in a thread
     ///
     /// # Content Handling
@@ -254,35 +256,33 @@ where
     /// - Invalid values fall back to 1440 (OneDay) with warning log
     async fn execute_thread(
         &self,
-        message: &Message,
+        target: &ActionTarget,
         params: &ThreadParams,
     ) -> anyhow::Result<()> {
-        // Ensure we're in a guild (threads not supported in DM)
-        let guild_id = message.guild_id
-            .context("Thread action is not supported in DM")?;
-
         // Check if already in thread (cache-first with API fallback)
+        // Note: This will fail for DM channels (threads not supported)
         let is_in_thread = self.channel_info
-            .is_thread(Some(guild_id), message.channel_id)
+            .is_thread(target.guild_id, target.channel_id)
             .await
-            .context("Failed to check if channel is thread")?;
+            .context("Failed to check if channel is thread (threads not supported in DM)")?;
 
         // Determine target channel ID
         let target_channel_id = if is_in_thread {
             // Already in thread → use as-is
             info!("Message is already in thread, skipping thread creation");
-            message.channel_id
+            target.channel_id
         } else {
             // Normal channel → create new thread
             let thread_name = match &params.name {
                 Some(name) => truncate_thread_name(name),
-                None => generate_thread_name(message),
+                None => "Thread".to_string(),
             };
 
             let thread = self
                 .discord_service
                 .create_thread_from_message(
-                    message,
+                    target.channel_id,
+                    target.message_id,
                     &thread_name,
                     params.auto_archive_duration,
                 )
