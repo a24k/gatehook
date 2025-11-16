@@ -1,6 +1,6 @@
 [package]
 name = "gatehook"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["Atsushi KAWASAKI <ak@xlix.org>"]
 description = "Bridge Discord Gateway (WebSocket) events to HTTP webhooks"
 edition = "2024"

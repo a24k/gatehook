@@ -8,9 +8,10 @@ use crate::bridge::message_delete_bulk_payload::MessageDeleteBulkPayload;
 use crate::bridge::message_delete_payload::MessageDeletePayload;
 use crate::bridge::message_payload::MessagePayload;
 use crate::bridge::message_update_payload::MessageUpdatePayload;
+use crate::bridge::reaction_payload::ReactionPayload;
 use crate::bridge::ready_payload::ReadyPayload;
 use anyhow::Context as _;
-use serenity::model::channel::Message;
+use serenity::model::channel::{Message, Reaction};
 use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
@@ -150,6 +151,54 @@ where
             .send("ready", &payload)
             .await
             .context("Failed to send ready event to HTTP endpoint")
+    }
+
+    /// Handle a reaction add event
+    ///
+    /// # Arguments
+    ///
+    /// * `reaction` - The reaction event from Discord
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (may contain actions)
+    pub async fn handle_reaction_add(
+        &self,
+        reaction: &Reaction,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            user_id = ?reaction.user_id,
+            message_id = %reaction.message_id,
+            channel_id = %reaction.channel_id,
+            "Processing reaction add event"
+        );
+
+        // Build payload with optional channel metadata
+        let payload = self.build_reaction_payload(reaction).await;
+
+        // Forward event to webhook endpoint and return response
+        self.event_sender
+            .send("reaction_add", &payload)
+            .await
+            .context("Failed to send reaction add event to HTTP endpoint")
+    }
+
+    /// Build reaction payload with optional channel info from cache
+    async fn build_reaction_payload<'a>(&self, reaction: &'a Reaction) -> ReactionPayload<'a> {
+        // Try to get channel info from cache if this is a guild reaction
+        match reaction.guild_id {
+            Some(guild_id) => {
+                match self
+                    .channel_info
+                    .get_channel(Some(guild_id), reaction.channel_id)
+                    .await
+                {
+                    Ok(Some(channel)) => ReactionPayload::with_channel(reaction, channel),
+                    _ => ReactionPayload::new(reaction),
+                }
+            }
+            None => ReactionPayload::new(reaction),
+        }
     }
 
     /// Execute actions from webhook response

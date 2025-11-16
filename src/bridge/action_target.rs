@@ -1,4 +1,4 @@
-use serenity::model::channel::Message;
+use serenity::model::channel::{Message, Reaction};
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 
 /// Target for webhook response actions.
@@ -37,6 +37,17 @@ impl From<&Message> for ActionTarget {
             message_id: message.id,
             channel_id: message.channel_id,
             guild_id: message.guild_id,
+        }
+    }
+}
+
+/// Convert a Reaction reference into an ActionTarget.
+impl From<&Reaction> for ActionTarget {
+    fn from(reaction: &Reaction) -> Self {
+        Self {
+            message_id: reaction.message_id,
+            channel_id: reaction.channel_id,
+            guild_id: reaction.guild_id,
         }
     }
 }

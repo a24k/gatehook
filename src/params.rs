@@ -1,16 +1,16 @@
 use anyhow::Context as _;
 use serde::Deserialize;
-use crate::bridge::message_filter::MessageFilterPolicy;
+use crate::bridge::sender_filter::SenderFilterPolicy;
 
-/// Deserialize environment variable string into MessageFilterPolicy
-fn deserialize_message_filter_policy<'de, D>(
+/// Deserialize environment variable string into SenderFilterPolicy
+fn deserialize_sender_filter_policy<'de, D>(
     deserializer: D,
-) -> Result<Option<MessageFilterPolicy>, D::Error>
+) -> Result<Option<SenderFilterPolicy>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s: Option<String> = Option::deserialize(deserializer)?;
-    Ok(s.map(|policy| MessageFilterPolicy::from_policy(&policy)))
+    Ok(s.map(|policy| SenderFilterPolicy::from_policy(&policy)))
 }
 
 #[derive(Deserialize, Clone)]
@@ -24,12 +24,12 @@ pub struct Params {
     // Event Configuration
     // ========================================
     // Direct Message Events
-    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
-    pub message_direct: Option<MessageFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub message_direct: Option<SenderFilterPolicy>,
 
     // Guild Events
-    #[serde(default, deserialize_with = "deserialize_message_filter_policy")]
-    pub message_guild: Option<MessageFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub message_guild: Option<SenderFilterPolicy>,
 
     // Message Delete Events
     #[serde(default)]
@@ -44,6 +44,12 @@ pub struct Params {
     pub message_update_direct: Option<String>,
     #[serde(default)]
     pub message_update_guild: Option<String>,
+
+    // Reaction Add Events
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub reaction_add_direct: Option<SenderFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub reaction_add_guild: Option<SenderFilterPolicy>,
 
     // Context-Independent Events
     #[serde(default)]
@@ -82,6 +88,8 @@ impl std::fmt::Debug for Params {
             .field("message_delete_bulk_guild", &self.message_delete_bulk_guild)
             .field("message_update_direct", &self.message_update_direct)
             .field("message_update_guild", &self.message_update_guild)
+            .field("reaction_add_direct", &self.reaction_add_direct)
+            .field("reaction_add_guild", &self.reaction_add_guild)
             .field("ready", &self.ready)
             .finish()
     }
@@ -100,6 +108,16 @@ impl Params {
     /// Check if Guild Message events are enabled
     pub fn has_guild_message_events(&self) -> bool {
         self.message_guild.is_some()
+    }
+
+    /// Check if Direct Reaction Add events are enabled
+    pub fn has_direct_reaction_add_events(&self) -> bool {
+        self.reaction_add_direct.is_some()
+    }
+
+    /// Check if Guild Reaction Add events are enabled
+    pub fn has_guild_reaction_add_events(&self) -> bool {
+        self.reaction_add_guild.is_some()
     }
 
     /// Check if any MESSAGE_DELETE events are enabled
@@ -145,6 +163,8 @@ mod tests {
             message_delete_bulk_guild: None,
             message_update_direct: None,
             message_update_guild: None,
+            reaction_add_direct: None,
+            reaction_add_guild: None,
             ready: None,
         };
 
