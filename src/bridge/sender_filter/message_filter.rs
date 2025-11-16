@@ -6,7 +6,7 @@ use super::policy::SenderFilterPolicy;
 /// Active message filter with bot's user ID
 ///
 /// This is created after the bot connects to Discord and knows its user ID.
-/// Can only be created via `SenderFilterPolicy::for_user()`.
+/// Can only be created via `SenderFilterPolicy::for_message()`.
 #[derive(Debug, Clone)]
 pub struct MessageFilter {
     user_id: UserId,
@@ -16,7 +16,7 @@ pub struct MessageFilter {
 impl MessageFilter {
     /// Create a new MessageFilter (private constructor)
     ///
-    /// This is intentionally not public. Use `SenderFilterPolicy::for_user()` instead.
+    /// This is intentionally not public. Use `SenderFilterPolicy::for_message()` instead.
     pub(super) fn new(user_id: UserId, policy: SenderFilterPolicy) -> Self {
         Self {
             user_id,
@@ -106,7 +106,7 @@ mod tests {
         #[case] should_allow: bool,
     ) {
         let policy = SenderFilterPolicy::from_policy(policy_str);
-        let filter = policy.for_user(UserId::new(123));
+        let filter = policy.for_message(UserId::new(123));
         let message = create_message(sender_type, 123);
 
         assert_eq!(
@@ -134,7 +134,7 @@ mod tests {
         #[case] description: &str,
     ) {
         let policy = SenderFilterPolicy::from_policy(lower_priority_policy);
-        let filter = policy.for_user(UserId::new(123));
+        let filter = policy.for_message(UserId::new(123));
 
         assert!(
             !filter.should_process(&message),
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_default_policy_blocks_self_allows_others() {
         let policy = SenderFilterPolicy::default();
-        let filter = policy.for_user(UserId::new(123));
+        let filter = policy.for_message(UserId::new(123));
 
         assert!(
             !filter.should_process(&MockMessage::new(123)),
@@ -174,8 +174,8 @@ mod tests {
     fn test_empty_policy_same_as_default() {
         let empty_policy = SenderFilterPolicy::from_policy("");
         let default_policy = SenderFilterPolicy::default();
-        let filter_empty = empty_policy.for_user(UserId::new(123));
-        let filter_default = default_policy.for_user(UserId::new(123));
+        let filter_empty = empty_policy.for_message(UserId::new(123));
+        let filter_default = default_policy.for_message(UserId::new(123));
 
         let test_messages = vec![
             MockMessage::new(123),                    // self

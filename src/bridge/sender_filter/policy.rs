@@ -89,12 +89,12 @@ impl SenderFilterPolicy {
         }
     }
 
-    /// Create a MessageFilter for a specific user ID
-    pub fn for_user(&self, current_user_id: UserId) -> MessageFilter {
+    /// Create a MessageFilter for MESSAGE events with the bot's user ID
+    pub fn for_message(&self, current_user_id: UserId) -> MessageFilter {
         MessageFilter::new(current_user_id, self.clone())
     }
 
-    /// Create a ReactionFilter for a specific user ID
+    /// Create a ReactionFilter for REACTION_ADD events with the bot's user ID
     pub fn for_reaction(&self, current_user_id: UserId) -> ReactionFilter {
         ReactionFilter::new(current_user_id, self.clone())
     }
@@ -163,13 +163,13 @@ mod tests {
     }
 
     #[test]
-    fn test_for_user_creates_filter() {
+    fn test_for_message_creates_filter() {
         use super::super::tests::MockMessage;
 
         let policy = SenderFilterPolicy::from_policy("user,bot");
         let user_id = UserId::new(12345);
 
-        let filter = policy.for_user(user_id);
+        let filter = policy.for_message(user_id);
 
         // Verify filter is created with correct user_id (tested via should_process)
         let self_message = MockMessage::new(12345);

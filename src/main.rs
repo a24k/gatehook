@@ -66,12 +66,12 @@ impl EventHandler for Handler {
         if let Some(policy) = &self.params.message_direct {
             let _ = self
                 .message_direct_filter
-                .set(policy.for_user(current_user_id));
+                .set(policy.for_message(current_user_id));
         }
         if let Some(policy) = &self.params.message_guild {
             let _ = self
                 .message_guild_filter
-                .set(policy.for_user(current_user_id));
+                .set(policy.for_message(current_user_id));
         }
         if let Some(policy) = &self.params.reaction_add_direct {
             let _ = self
