@@ -1,6 +1,6 @@
-mod filter;
 mod filterable_message;
 mod filterable_reaction;
+mod message_filter;
 mod policy;
 mod reaction_filter;
 
@@ -8,6 +8,6 @@ mod reaction_filter;
 mod tests;
 
 // Re-export public API
-pub use filter::MessageFilter;
+pub use message_filter::MessageFilter;
 pub use policy::SenderFilterPolicy;
 pub use reaction_filter::ReactionFilter;

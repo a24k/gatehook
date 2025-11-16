@@ -1,6 +1,6 @@
 use serenity::model::id::UserId;
 
-use super::filter::MessageFilter;
+use super::message_filter::MessageFilter;
 use super::reaction_filter::ReactionFilter;
 
 /// Sender filter policy parsed from environment variable
