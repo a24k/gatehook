@@ -899,3 +899,12 @@ async fn test_execute_actions_from_reaction() {
     assert_eq!(reactions[0].message_id, MessageId::new(8888));
     assert_eq!(reactions[0].channel_id, ChannelId::new(9999));
 }
+
+// Note: Testing error 160004 handling requires complex error mocking that would need
+// additional abstraction layers (error factories, etc.). This is deferred for now.
+// The implementation handles error 160004 by:
+// 1. Detecting the error code in execute_thread
+// 2. Calling get_message to retrieve the message with thread info
+// 3. Posting to the existing thread instead of creating a new one
+//
+// Manual testing on Discord is recommended to verify this behavior.

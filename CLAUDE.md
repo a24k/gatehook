@@ -60,7 +60,7 @@ The project follows a **layered architecture** with clear separation of concerns
 External service abstractions and implementations:
 
 - **`DiscordService` trait**: Abstracts Discord write operations
-  - Methods: `react_to_message`, `create_thread_from_message`, `send_message_to_channel`, `reply_in_channel`
+  - Methods: `react_to_message`, `create_thread_from_message`, `send_message_to_channel`, `reply_in_channel`, `get_message`
   - `SerenityDiscordService`: Production implementation using serenity
     - Handles Discord API type conversions (e.g., u16 → AutoArchiveDuration)
   - `MockDiscordService` (tests): Records calls for verification
@@ -243,6 +243,7 @@ Entry point that wires everything together:
   - `execute_thread()`: Create threads or send message to existing thread
     - Auto-generates thread name from message if not specified
     - Detects if already in thread (skips creation, sends message instead)
+    - Handles error 160004 (thread already exists): Retrieves message, finds existing thread, posts to it
 
 ### `bridge/sender_filter/`
 Modular event filtering by sender type with 2-phase initialization:

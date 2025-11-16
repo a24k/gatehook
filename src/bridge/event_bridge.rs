@@ -303,6 +303,10 @@ where
     /// # Auto-archive Duration
     /// - Valid values: 60, 1440, 4320, 10080 (minutes)
     /// - Invalid values fall back to 1440 (OneDay) with warning log
+    ///
+    /// # Error Handling
+    /// - If thread creation fails with error code 160004 (thread already exists),
+    ///   retrieves the existing thread and posts to it
     async fn execute_thread(
         &self,
         target: &ActionTarget,
@@ -327,7 +331,7 @@ where
                 None => "Thread".to_string(),
             };
 
-            let thread = self
+            match self
                 .discord_service
                 .create_thread_from_message(
                     target.channel_id,
@@ -336,14 +340,54 @@ where
                     params.auto_archive_duration,
                 )
                 .await
-                .context("Failed to create thread")?;
+            {
+                Ok(thread) => {
+                    info!(
+                        thread_id = %thread.id,
+                        thread_name = %thread_name,
+                        "Created new thread"
+                    );
+                    thread.id
+                }
+                Err(serenity::Error::Http(http_error)) => {
+                    // Check if error is "thread already exists" (error code 160004)
+                    if Self::is_thread_already_exists_error(&http_error) {
+                        info!("Thread already exists for this message, retrieving existing thread");
 
-            info!(
-                thread_id = %thread.id,
-                thread_name = %thread_name,
-                "Created new thread"
-            );
-            thread.id
+                        // Get message to find existing thread
+                        let message = self
+                            .discord_service
+                            .get_message(target.channel_id, target.message_id)
+                            .await
+                            .context("Failed to get message to find existing thread")?;
+
+                        // Extract thread ID from message
+                        let thread_id = message
+                            .thread
+                            .as_ref()
+                            .map(|t| t.id)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Thread creation failed with 160004 but message has no thread field"
+                                )
+                            })?;
+
+                        info!(
+                            thread_id = %thread_id,
+                            "Found existing thread from message"
+                        );
+                        thread_id
+                    } else {
+                        // Other HTTP error
+                        return Err(serenity::Error::Http(http_error))
+                            .context("Failed to create thread");
+                    }
+                }
+                Err(e) => {
+                    // Non-HTTP error
+                    return Err(e).context("Failed to create thread");
+                }
+            }
         };
 
         // Truncate content
@@ -362,6 +406,17 @@ where
         );
 
         Ok(())
+    }
+
+    /// Check if HTTP error is "thread already exists" (error code 160004)
+    fn is_thread_already_exists_error(http_error: &serenity::http::HttpError) -> bool {
+        use serenity::http::HttpError;
+
+        if let HttpError::UnsuccessfulRequest(error_response) = http_error {
+            error_response.error.code == 160004
+        } else {
+            false
+        }
     }
 
     /// Handle a message_delete event
