@@ -31,12 +31,16 @@ src/
     ├── message_payload.rs  # MessagePayload wrapper with GuildChannel metadata
     ├── ready_payload.rs    # ReadyPayload wrapper for ready events
     ├── discord_text.rs     # Discord text utilities (truncation, thread name generation)
-    ├── message_filter/     # Message filtering by sender type
+    ├── reaction_payload.rs # ReactionPayload wrapper with GuildChannel metadata
+    ├── action_target.rs    # ActionTarget abstraction for executing webhook actions
+    ├── sender_filter/      # Event filtering by sender type (MESSAGE, REACTION_ADD)
     │   ├── mod.rs              # Public API re-exports
-    │   ├── policy.rs           # MessageFilterPolicy (startup parsing)
-    │   ├── filter.rs           # MessageFilter (runtime filtering)
+    │   ├── policy.rs           # SenderFilterPolicy (startup parsing)
+    │   ├── message_filter.rs   # MessageFilter (runtime filtering for MESSAGE events)
+    │   ├── reaction_filter.rs  # ReactionFilter (runtime filtering for REACTION_ADD events)
     │   ├── filterable_message.rs # FilterableMessage trait
-    │   └── tests.rs            # Shared test helpers (MockMessage)
+    │   ├── filterable_reaction.rs # FilterableReaction trait
+    │   └── tests.rs            # Shared test helpers (MockMessage, MockReaction)
     └── mod.rs
 
 tests/
@@ -116,12 +120,33 @@ Business logic that orchestrates adapters:
   - JSON structure: `{ "ready": {...} }`
   - Contains bot connection information (user, guilds, session_id, etc.)
 
-- **`MessageFilter` module**: Filters messages based on sender type (2-phase initialization)
-  - **`MessageFilterPolicy`**: Parsed at startup from environment variables via serde
+- **`ReactionPayload`**: Wrapper for webhook payloads with channel metadata
+  - Combines serenity's `Reaction` with optional `GuildChannel`
+  - `with_channel()`: Constructor for guild reactions with channel info
+  - `new()`: Constructor for DMs or cache misses (no channel field)
+  - JSON structure: `{ "reaction": {...}, "channel": {...} }`
+  - `reaction` field contains all Discord Reaction fields
+  - `channel` field omitted from JSON when None via `#[serde(skip_serializing_if)]`
+
+- **`ActionTarget`**: Abstraction for webhook response action execution
+  - Represents minimal information needed to execute Discord actions (message_id, channel_id, guild_id)
+  - Enables different event types (Message, Reaction, etc.) to be used as action targets
+  - `From<&Message>` and `From<&Reaction>` implementations for easy conversion
+  - Provides guild_id for performance optimization (O(1) cache lookups) and future guild-specific actions
+
+- **`sender_filter` module**: Filters events based on sender type (2-phase initialization)
+  - **`SenderFilterPolicy`**: Parsed at startup from environment variables via serde
+    - Shared policy for both MESSAGE and REACTION_ADD events
+    - Creates `MessageFilter` via `for_user()` method
+    - Creates `ReactionFilter` via `for_reaction()` method
   - **`MessageFilter`**: Created in `ready` event with bot's user_id for runtime filtering
+    - Sender type classification (mutually exclusive): self, webhook, system, bot, user
+  - **`ReactionFilter`**: Created in `ready` event with bot's user_id for runtime filtering
+    - Sender type classification (mutually exclusive): self, bot, user
+    - Excludes webhook/system types (MESSAGE-only concepts)
   - **`FilterableMessage`**: Trait abstraction for testing without serenity's Message type
-  - **`MockMessage`**: Shared test helper for unit tests
-  - Sender type classification (mutually exclusive categories): self, webhook, system, bot, user
+  - **`FilterableReaction`**: Trait abstraction for testing without serenity's Reaction type
+  - **`MockMessage`** and **`MockReaction`**: Shared test helpers for unit tests
   - Tests colocated with modules using rstest for parameterized testing
 
 ### Application Layer (`src/main.rs`)
@@ -129,12 +154,13 @@ Entry point that wires everything together:
 
 - `Handler`: Thin adapter implementing serenity's `EventHandler`
 - Passes `ctx.http` from Context to bridge (follows serenity's design)
-- Stores `MessageFilter` instances in `OnceLock` for Direct/Guild contexts
-- 2-phase initialization: Policy parsed at startup, Filter created in `ready` event
+- Stores `MessageFilter` and `ReactionFilter` instances in `OnceLock` for Direct/Guild contexts
+- 2-phase initialization: Policy parsed at startup, Filters created in `ready` event
 - Dynamically builds `GatewayIntents` based on enabled events
-- Currently handles: `ready`, `message` events
+- Currently handles: `ready`, `message`, `message_delete`, `message_delete_bulk`, `message_update`, `reaction_add` events
 - Applies `MessageFilter` based on message context (Direct/Guild)
-- **Webhook action flow**: `handle_message` → webhook response → `execute_actions`
+- Applies `ReactionFilter` based on reaction context (Direct/Guild)
+- **Webhook action flow**: `handle_message`/`handle_reaction_add` → webhook response → `execute_actions`
 
 ## Key Modules
 
@@ -142,9 +168,14 @@ Entry point that wires everything together:
 - `Params` struct: Configuration loaded from environment variables using serde
 - Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
 - Optional: `INSECURE_MODE`, `RUST_LOG`
-- Event configuration: `MESSAGE_DIRECT`, `MESSAGE_GUILD`, `READY` (all optional)
-  - Parsed into `Option<MessageFilterPolicy>` using custom serde deserializer
-- Helper methods: `has_direct_message_events()`, `has_guild_message_events()`
+- Event configuration (all optional):
+  - MESSAGE events: `MESSAGE_DIRECT`, `MESSAGE_GUILD` (parsed into `Option<SenderFilterPolicy>`)
+  - MESSAGE_DELETE events: `MESSAGE_DELETE_DIRECT`, `MESSAGE_DELETE_GUILD`, `MESSAGE_DELETE_BULK_GUILD`
+  - MESSAGE_UPDATE events: `MESSAGE_UPDATE_DIRECT`, `MESSAGE_UPDATE_GUILD`
+  - REACTION_ADD events: `REACTION_ADD_DIRECT`, `REACTION_ADD_GUILD` (parsed into `Option<SenderFilterPolicy>`)
+  - Context-independent: `READY`
+- Custom serde deserializer: `deserialize_sender_filter_policy`
+- Helper methods: `has_direct_message_events()`, `has_guild_message_events()`, `has_direct_reaction_add_events()`, `has_guild_reaction_add_events()`, etc.
 
 ### `adapters/http_event_sender.rs`
 - `HttpEventSender`: Sends events to HTTP endpoints and parses responses
@@ -213,19 +244,21 @@ Entry point that wires everything together:
     - Auto-generates thread name from message if not specified
     - Detects if already in thread (skips creation, sends message instead)
 
-### `bridge/message_filter/`
-Modular message filtering with 2-phase initialization:
+### `bridge/sender_filter/`
+Modular event filtering by sender type with 2-phase initialization:
 
-**`policy.rs` - MessageFilterPolicy**
+**`policy.rs` - SenderFilterPolicy**
 - Parsed at startup from environment variables using `from_policy("user,bot")`
 - Special values: `"all"` (everything), `""` (everything except self)
 - Implements `Default` trait (safe default: allow all except self)
+- Shared policy for both MESSAGE and REACTION_ADD events
 - Creates `MessageFilter` instances via `for_user(current_user_id)` method
-- Tests: policy parsing, Default trait, for_user() method (using rstest)
+- Creates `ReactionFilter` instances via `for_reaction(current_user_id)` method
+- Tests: policy parsing, Default trait, for_user() and for_reaction() methods (using rstest)
 
-**`filter.rs` - MessageFilter**
+**`message_filter.rs` - MessageFilter**
 - Created in `ready` event with bot's `user_id` embedded
-- Runtime filtering via `should_process(&message)` → bool
+- Runtime filtering for MESSAGE events via `should_process(&message)` → bool
 - Classification categories (mutually exclusive, priority order):
   1. `self` - Bot's own messages
   2. `webhook` - Webhook messages (excluding self)
@@ -234,14 +267,31 @@ Modular message filtering with 2-phase initialization:
   5. `user` - Human users (default/fallback)
 - Tests: sender type filtering, priority rules (using rstest)
 
+**`reaction_filter.rs` - ReactionFilter**
+- Created in `ready` event with bot's `user_id` embedded
+- Runtime filtering for REACTION_ADD events via `should_process(&reaction)` → bool
+- Classification categories (mutually exclusive, priority order):
+  1. `self` - Bot's own reactions
+  2. `bot` - Other bot reactions (excluding self)
+  3. `user` - Human users (default/fallback)
+- Note: Webhook and system types excluded (MESSAGE-only concepts)
+- Tests: sender type filtering, priority rules (using rstest)
+
 **`filterable_message.rs` - FilterableMessage**
 - Trait abstraction for message properties needed for filtering
 - Implemented by serenity's `Message` type
 - Enables testing without constructing serenity's non-exhaustive Message struct
 
+**`filterable_reaction.rs` - FilterableReaction**
+- Trait abstraction for reaction properties needed for filtering
+- Implemented by serenity's `Reaction` type
+- Enables testing without constructing serenity's non-exhaustive Reaction struct
+- Methods: `user_id()`, `is_bot()`
+
 **`tests.rs` - Test Helpers**
 - `MockMessage`: Shared test helper with builder pattern
-- Used by tests in both `policy.rs` and `filter.rs`
+- `MockReaction`: Shared test helper with builder pattern
+- Used by tests in policy.rs, message_filter.rs, and reaction_filter.rs
 
 ### `bridge/discord_text.rs`
 Discord text processing utilities for API length limitations:
@@ -305,10 +355,11 @@ tests/
 
 src/adapters/event_response.rs  # Contains #[cfg(test)] mod tests (18 tests)
 src/bridge/discord_text.rs      # Contains #[cfg(test)] mod tests (18 tests)
-src/bridge/message_filter/
+src/bridge/sender_filter/
 ├── policy.rs                # Contains #[cfg(test)] mod tests
-├── filter.rs                # Contains #[cfg(test)] mod tests
-└── tests.rs                 # Shared MockMessage helper
+├── message_filter.rs        # Contains #[cfg(test)] mod tests
+├── reaction_filter.rs       # Contains #[cfg(test)] mod tests
+└── tests.rs                 # Shared MockMessage and MockReaction helpers
 ```
 
 ### Testing Best Practices
@@ -347,6 +398,10 @@ src/bridge/message_filter/
 18. **Enriched webhook payloads**: Send complete GuildChannel metadata to webhooks instead of just boolean flags (more flexible for webhook consumers)
 19. **Lock-free cache extraction**: Extract data from cache before await points to avoid Send trait issues with Arc<RwLock<>>
 20. **Optional payload fields**: Use `#[serde(skip_serializing_if)]` to keep webhook payloads clean (omit None values)
+21. **Shared SenderFilterPolicy**: Single policy abstraction for all sender-based filtering (MESSAGE, REACTION_ADD) reduces code duplication
+22. **Event-specific filter types**: MessageFilter and ReactionFilter tailor sender classification to event context (e.g., reactions exclude webhook/system types)
+23. **ActionTarget abstraction**: Unified target for webhook response actions enables different event types (Message, Reaction) to support same action types
+24. **Trait abstraction for event types**: FilterableReaction trait mirrors FilterableMessage pattern for consistent testing approach
 
 ### Future Growth Path
 When complexity increases:
@@ -367,8 +422,9 @@ When complexity increases:
 4. Add event handler method to `EventBridge` in `src/bridge/event_bridge.rs`
 5. Implement handler in `Handler` trait in `main.rs`:
    - Check if event is enabled via `params.<event>_direct` / `params.<event>_guild`
-   - Apply `MessageFilter` if applicable
-   - Call bridge method, passing `ctx.http`
+   - Apply `MessageFilter` or `ReactionFilter` if applicable (for events with sender filtering)
+   - Call bridge method
+   - Execute webhook response actions if supported for this event type
 6. Update `.env.example` with new environment variable
 7. Update README.md "Available Events" table
 8. Add tests in `tests/event_bridge_test.rs` using mocks

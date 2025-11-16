@@ -6,10 +6,10 @@ Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 ## Features
 
 - 🎯 **Selective Event Handling** - Enable only the events you need via environment variables
-- 🔍 **Fine-grained Message Filtering** - Filter messages by sender type (self, bot, user, webhook, system)
+- 🔍 **Fine-grained Sender Filtering** - Filter events by sender type (self, bot, user, webhook, system)
 - 📨 **Context-aware Configuration** - Separate filters for Direct Messages and Guild (server) messages
 - ⚡ **Dynamic Gateway Intents** - Automatically requests only the permissions needed for enabled events
-- 🔐 **Secure by Default** - Bot's own messages filtered out by default to prevent loops
+- 🔐 **Secure by Default** - Bot's own events filtered out by default to prevent loops
 
 ## Quick Start
 
@@ -21,6 +21,7 @@ export HTTP_ENDPOINT="https://your-webhook-endpoint.com/webhook"
 # 2. Enable desired events
 export MESSAGE_DIRECT="user,bot,webhook,system"  # DM: everything except self
 export MESSAGE_GUILD="user"                      # Guild: only human users
+export REACTION_ADD_GUILD="user,bot"             # Guild reactions: users and bots
 
 # 3. Run
 cargo run --release
@@ -103,10 +104,16 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
       <td><code>MESSAGE_DELETE_BULK_GUILD</code></td>
       <td>Multiple messages deleted at once (guild only)</td>
     </tr>
+    <tr>
+      <td>Reaction Add</td>
+      <td><code>REACTION_ADD_DIRECT</code></td>
+      <td><code>REACTION_ADD_GUILD</code></td>
+      <td>Reaction added to a message</td>
+    </tr>
   </tbody>
 </table>
 
-*More events coming soon: REACTION_ADD, REACTION_REMOVE, etc.*
+*More events coming soon: REACTION_REMOVE, etc.*
 
 #### Configuration Examples
 
@@ -136,11 +143,17 @@ MESSAGE_DELETE_BULK_GUILD="all"
 
 # Example 7: Monitor DM deletions
 MESSAGE_DELETE_DIRECT="all"
+
+# Example 8: Track reactions from users and bots
+REACTION_ADD_GUILD="user,bot"
+REACTION_ADD_DIRECT="user"
 ```
 
 ### Sender Type Classification
 
-Messages are classified into mutually exclusive sender categories. Each message falls into exactly one category:
+Events with sender filtering (MESSAGE and REACTION_ADD) classify senders into mutually exclusive categories:
+
+#### For MESSAGE Events
 
 1. **self** - Bot's own messages
 2. **webhook** - Webhook messages (excluding self)
@@ -150,8 +163,16 @@ Messages are classified into mutually exclusive sender categories. Each message 
 
 **Note**: Discord webhooks have `author.bot = true`, but are classified as `webhook` rather than `bot` to allow separate filtering policies.
 
+#### For REACTION_ADD Events
+
+1. **self** - Bot's own reactions
+2. **bot** - Other bot reactions (excluding self)
+3. **user** - Human user reactions (default/fallback)
+
+**Note**: Webhook and system types don't apply to reactions (MESSAGE-only concepts).
+
 This classification ensures:
-- Every message is classified exactly once
+- Every event is classified exactly once
 - No ambiguity in filtering decisions
 - Predictable behavior
 
@@ -411,6 +432,71 @@ The request body contains multiple message IDs:
 
 **Note:** Bulk delete only occurs in guilds (not DMs) when using Discord's bulk delete API. The same limitations as single delete apply - no content available.
 
+### Reaction Add Event Payload
+
+When a reaction is added to a message (if `REACTION_ADD_DIRECT` or `REACTION_ADD_GUILD` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=reaction_add
+```
+
+The request body contains the reaction data wrapped in a `reaction` key, with optional channel metadata:
+
+```json
+{
+  "reaction": {
+    "user_id": "123456789012345678",
+    "message_id": "987654321098765432",
+    "channel_id": "111111111111111111",
+    "guild_id": "222222222222222222",
+    "emoji": {
+      "id": null,
+      "name": "👍",
+      "animated": false
+    },
+    "member": {
+      "user": {
+        "id": "123456789012345678",
+        "username": "user123",
+        "discriminator": "0",
+        "avatar": "...",
+        "bot": false
+      },
+      "roles": ["333333333333333333"],
+      "joined_at": "2023-01-15T12:00:00.000Z",
+      "nick": "User's Nickname"
+    }
+  },
+  "channel": {
+    "id": "111111111111111111",
+    "name": "general",
+    "type": 0,
+    "parent_id": null,
+    "topic": "General discussion",
+    "position": 0
+  }
+}
+```
+
+**Note:** The `guild_id` field is null for direct messages.
+
+**The `channel` field:**
+- **Present:** For guild reactions when `REACTION_ADD_GUILD` is enabled
+- **Absent:** For direct message reactions, or if channel information is not available in cache
+
+**The `member` field:**
+- **Present:** For guild reactions (contains user info and guild-specific data)
+- **Absent:** For direct message reactions
+
+**Emoji object:**
+- **Unicode emoji**: `id` is null, `name` contains the emoji (e.g., "👍")
+- **Custom emoji**: `id` contains emoji ID, `name` contains emoji name
+
+**Sender filtering:**
+- Uses same filtering policy as MESSAGE events
+- Available filter types: `self`, `bot`, `user`
+- Webhook and system types don't apply to reactions
+
 ## Webhook Response Actions
 
 Your HTTP endpoint can respond with actions for gatehook to execute on Discord. This enables bidirectional communication - your webhook receives events and can instruct gatehook to reply, react, or perform other Discord operations.
@@ -437,7 +523,7 @@ Return a JSON object with an `actions` array:
 
 Reply to the message that triggered the event.
 
-**Available in:** `message` handler only
+**Available in:** `message` and `reaction_add` handlers
 
 ```json
 {
@@ -480,7 +566,7 @@ Reply to the message that triggered the event.
 
 Add a reaction emoji to the message that triggered the event.
 
-**Available in:** `message` handler only
+**Available in:** `message` and `reaction_add` handlers
 
 ```json
 {
@@ -514,7 +600,7 @@ Add a reaction emoji to the message that triggered the event.
 
 Create a thread from the message that triggered the event (or send a message if already in a thread).
 
-**Available in:** `message` handler in guild channels only (not DMs)
+**Available in:** `message` and `reaction_add` handlers in guild channels only (not DMs)
 
 ```json
 {
@@ -631,13 +717,13 @@ If your endpoint returns an empty response or no `actions` field, no actions are
 - **MESSAGE_CONTENT** 🔒 *(Auto-enabled with MESSAGE_CREATE or MESSAGE_UPDATE)*
   - Automatically enabled when MESSAGE_DIRECT, MESSAGE_GUILD, MESSAGE_UPDATE_DIRECT, or MESSAGE_UPDATE_GUILD is configured
   - Not required for MESSAGE_DELETE events (only IDs available, no content)
-- **GUILD_MESSAGE_REACTIONS**
-  - [ ] `MESSAGE_REACTION_ADD`
+- **GUILD_MESSAGE_REACTIONS** 🎯
+  - [x] `MESSAGE_REACTION_ADD` via `REACTION_ADD_GUILD`
   - [ ] `MESSAGE_REACTION_REMOVE`
   - [ ] `MESSAGE_REACTION_REMOVE_ALL`
   - [ ] `MESSAGE_REACTION_REMOVE_EMOJI`
-- **DIRECT_MESSAGE_REACTIONS**
-  - [ ] `MESSAGE_REACTION_ADD`
+- **DIRECT_MESSAGE_REACTIONS** 🎯
+  - [x] `MESSAGE_REACTION_ADD` via `REACTION_ADD_DIRECT`
   - [ ] `MESSAGE_REACTION_REMOVE`
   - [ ] `MESSAGE_REACTION_REMOVE_ALL`
   - [ ] `MESSAGE_REACTION_REMOVE_EMOJI`
