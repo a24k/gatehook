@@ -1,6 +1,7 @@
 use serenity::model::id::UserId;
 
 use super::filter::MessageFilter;
+use super::reaction_filter::ReactionFilter;
 
 /// Sender filter policy parsed from environment variable
 ///
@@ -91,6 +92,11 @@ impl SenderFilterPolicy {
     /// Create a MessageFilter for a specific user ID
     pub fn for_user(&self, current_user_id: UserId) -> MessageFilter {
         MessageFilter::new(current_user_id, self.clone())
+    }
+
+    /// Create a ReactionFilter for a specific user ID
+    pub fn for_reaction(&self, current_user_id: UserId) -> ReactionFilter {
+        ReactionFilter::new(current_user_id, self.clone())
     }
 }
 
