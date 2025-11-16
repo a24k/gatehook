@@ -5,5 +5,6 @@ pub mod message_delete_bulk_payload;
 pub mod message_delete_payload;
 pub mod message_payload;
 pub mod message_update_payload;
+pub mod reaction_payload;
 pub mod ready_payload;
 pub mod sender_filter;
