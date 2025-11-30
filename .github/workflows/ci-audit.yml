@@ -1,0 +1,17 @@
+name: CI - Security Audit
+
+on:
+  pull_request:
+  schedule:
+    # Run daily at 00:00 UTC (09:00 JST) to catch newly disclosed vulnerabilities
+    - cron: '0 0 * * *'
+
+jobs:
+  security-audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
