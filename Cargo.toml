@@ -5,6 +5,12 @@ authors = ["Atsushi KAWASAKI <ak@xlix.org>"]
 description = "Bridge Discord Gateway (WebSocket) events to HTTP webhooks"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/a24k/gatehook"
+homepage = "https://github.com/a24k/gatehook"
+documentation = "https://github.com/a24k/gatehook/blob/main/README.md"
+keywords = ["discord", "webhook", "gateway", "bridge"]
+categories = ["api-bindings", "network-programming"]
+readme = "README.md"
 
 [lib]
 name = "gatehook"
