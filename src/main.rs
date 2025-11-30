@@ -59,8 +59,13 @@ impl EventHandler for Handler {
         let endpoint = url::Url::parse(&self.params.http_endpoint)
             .expect("HTTP_ENDPOINT already validated");
         let event_sender = Arc::new(
-            HttpEventSender::new(endpoint, self.params.insecure_mode)
-                .expect("HttpEventSender already validated")
+            HttpEventSender::new(
+                endpoint,
+                self.params.insecure_mode,
+                self.params.http_timeout,
+                self.params.http_connect_timeout,
+            )
+            .expect("HttpEventSender already validated")
         );
 
         let bridge = EventBridge::new(discord_service, event_sender, channel_info);

@@ -2,6 +2,16 @@ use anyhow::Context as _;
 use serde::Deserialize;
 use crate::bridge::sender_filter::SenderFilterPolicy;
 
+/// Default HTTP request timeout in seconds (5 minutes)
+fn default_http_timeout() -> u64 {
+    300
+}
+
+/// Default HTTP connection timeout in seconds
+fn default_http_connect_timeout() -> u64 {
+    10
+}
+
 /// Deserialize environment variable string into SenderFilterPolicy
 fn deserialize_sender_filter_policy<'de, D>(
     deserializer: D,
@@ -19,6 +29,12 @@ pub struct Params {
     pub insecure_mode: bool,
     pub discord_token: String,
     pub http_endpoint: String,
+
+    // HTTP Client Configuration
+    #[serde(default = "default_http_timeout")]
+    pub http_timeout: u64,
+    #[serde(default = "default_http_connect_timeout")]
+    pub http_connect_timeout: u64,
 
     // ========================================
     // Event Configuration
@@ -87,6 +103,8 @@ impl std::fmt::Debug for Params {
             .field("insecure_mode", &self.insecure_mode)
             .field("discord_token", &mask_token(&self.discord_token))
             .field("http_endpoint", &self.http_endpoint)
+            .field("http_timeout", &self.http_timeout)
+            .field("http_connect_timeout", &self.http_connect_timeout)
             .field("message_direct", &self.message_direct)
             .field("message_guild", &self.message_guild)
             .field("message_delete_direct", &self.message_delete_direct)
@@ -174,6 +192,8 @@ mod tests {
             insecure_mode: false,
             discord_token: "MTExMjIyMzMzNDQ0NTU1NjY2Nzc3ODg4OTk5".to_string(),
             http_endpoint: "https://example.com/webhook/secret123456".to_string(),
+            http_timeout: default_http_timeout(),
+            http_connect_timeout: default_http_connect_timeout(),
             message_direct: None,
             message_guild: None,
             message_delete_direct: None,

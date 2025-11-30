@@ -41,6 +41,8 @@ cargo run --release
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `INSECURE_MODE` | Accept invalid TLS certificates (testing only) | `false` | `true` |
+| `HTTP_TIMEOUT` | HTTP request timeout in seconds | `300` (5 minutes) | `600` |
+| `HTTP_CONNECT_TIMEOUT` | HTTP connection timeout in seconds | `10` | `30` |
 | `RUST_LOG` | Logging level (see [Logging](#logging)) | `gatehook=info,serenity=warn` | `debug` |
 
 ### Event Handler Configuration
