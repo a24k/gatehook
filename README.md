@@ -153,8 +153,8 @@ REACTION_ADD_GUILD="user,bot"
 REACTION_ADD_DIRECT="user"
 
 # Example 9: Track reaction removal events
-REACTION_REMOVE_GUILD="user"
-REACTION_REMOVE_DIRECT="user,bot"
+REACTION_REMOVE_GUILD="user,bot"
+REACTION_REMOVE_DIRECT="user"
 ```
 
 ### Sender Type Classification
