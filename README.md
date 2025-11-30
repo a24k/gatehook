@@ -211,13 +211,37 @@ RUST_LOG=trace ./gatehook
 
 ## Event Forwarding Format
 
-Events are forwarded to your HTTP endpoint as JSON POST requests with the event type specified as a query parameter:
+Events are forwarded to your HTTP endpoint as JSON POST requests with the event type specified as a query parameter.
+
+### Ready Event Payload
+
+Sent when bot connects to Discord (if `READY` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=ready
+```
+
+```json
+{
+  "ready": {
+    "v": 10,
+    "user": {"id": "123456789012345678", "username": "MyBot", "bot": true, ...},
+    "guilds": [{"id": "987654321098765432", "unavailable": false}],
+    "session_id": "...",
+    "shard": [0, 1],
+    "application": {"id": "123456789012345678", "flags": 0}
+    // ... see Discord Ready event documentation
+  }
+}
+```
+
+Contains bot connection info: user, guilds, session_id, shard. See [Discord Ready event](https://discord.com/developers/docs/topics/gateway-events#ready).
+
+### Message Event Payload
 
 ```
 POST {HTTP_ENDPOINT}?handler=message
 ```
-
-### Message Event Payload
 
 ```json
 {
@@ -256,30 +280,6 @@ The `channel.type` field is an integer representing the channel type:
 - Other types: `4` (Category), `5` (News), `13` (Stage), `15` (Forum)
 
 See [Discord's Channel Types](https://discord.com/developers/docs/resources/channel#channel-object-channel-types) for the complete list.
-
-### Ready Event Payload
-
-Sent when bot connects to Discord (if `READY` is enabled):
-
-```
-POST {HTTP_ENDPOINT}?handler=ready
-```
-
-```json
-{
-  "ready": {
-    "v": 10,
-    "user": {"id": "123456789012345678", "username": "MyBot", "bot": true, ...},
-    "guilds": [{"id": "987654321098765432", "unavailable": false}],
-    "session_id": "...",
-    "shard": [0, 1],
-    "application": {"id": "123456789012345678", "flags": 0}
-    // ... see Discord Ready event documentation
-  }
-}
-```
-
-Contains bot connection info: user, guilds, session_id, shard. See [Discord Ready event](https://discord.com/developers/docs/topics/gateway-events#ready).
 
 ### Message Update Event Payload
 
@@ -370,6 +370,14 @@ POST {HTTP_ENDPOINT}?handler=reaction_add
 | `channel` | Guild reactions | Discord GuildChannel object (omitted for DMs or cache miss) |
 
 **Emoji:** Unicode (`id`: null, `name`: "👍") or custom (`id`: emoji ID, `name`: emoji name). **Sender filtering:** `self`, `bot`, `user` (webhook/system don't apply).
+
+### Reaction Remove Event Payload
+
+```
+POST {HTTP_ENDPOINT}?handler=reaction_remove
+```
+
+Payload structure is identical to Reaction Add event. See above for field descriptions.
 
 ## Webhook Response Actions
 
