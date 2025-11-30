@@ -184,31 +184,6 @@ This classification ensures:
 - No ambiguity in filtering decisions
 - Predictable behavior
 
-## Logging
-
-gatehook uses the [tracing](https://github.com/tokio-rs/tracing) crate for structured logging.
-
-### Log Levels
-
-- `error` - Only error messages
-- `warn` - Warnings and errors
-- `info` - Informational messages (default)
-- `debug` - Detailed debug information including message contents
-- `trace` - Very verbose logs for debugging
-
-### Examples
-
-```bash
-# Default logging
-./gatehook
-
-# Debug logging for gatehook, suppress serenity
-RUST_LOG=gatehook=debug,serenity=warn ./gatehook
-
-# Trace everything
-RUST_LOG=trace ./gatehook
-```
-
 ## Event Forwarding Format
 
 Events are forwarded to your HTTP endpoint as JSON POST requests with the event type specified as a query parameter.
@@ -418,6 +393,24 @@ All actions are available in `message`, `reaction_add`, and `reaction_remove` ha
 See [Available Events](#available-events) for currently supported Discord events. Gateway intents are automatically configured based on enabled events.
 
 For planned feature support and roadmap, see [ROADMAP.md](ROADMAP.md).
+
+## Logging
+
+gatehook uses the [tracing](https://github.com/tokio-rs/tracing) crate for structured logging.
+
+**Log Levels:** `error`, `warn`, `info` (default), `debug`, `trace`
+
+**Examples:**
+```bash
+# Default logging
+./gatehook
+
+# Debug logging for gatehook, suppress serenity
+RUST_LOG=gatehook=debug,serenity=warn ./gatehook
+
+# Trace everything
+RUST_LOG=trace ./gatehook
+```
 
 ## Development
 
