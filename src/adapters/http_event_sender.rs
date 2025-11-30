@@ -19,9 +19,18 @@ impl HttpEventSender {
     ///
     /// * `endpoint` - The HTTP endpoint URL
     /// * `insecure_mode` - If true, accept invalid TLS certificates
-    pub fn new(endpoint: Url, insecure_mode: bool) -> anyhow::Result<Self> {
+    /// * `timeout_secs` - Request timeout in seconds
+    /// * `connect_timeout_secs` - Connection timeout in seconds
+    pub fn new(
+        endpoint: Url,
+        insecure_mode: bool,
+        timeout_secs: u64,
+        connect_timeout_secs: u64,
+    ) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(insecure_mode)
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .connect_timeout(std::time::Duration::from_secs(connect_timeout_secs))
             .build()
             .context("Building HTTP Client")?;
 
@@ -108,7 +117,7 @@ mod tests {
     #[case(true)]
     fn test_http_event_sender_creation(#[case] insecure_mode: bool) {
         let url = Url::parse("https://example.com/webhook").unwrap();
-        let sender = HttpEventSender::new(url, insecure_mode);
+        let sender = HttpEventSender::new(url, insecure_mode, 300, 10);
         assert!(sender.is_ok());
     }
 
@@ -116,7 +125,7 @@ mod tests {
     fn test_endpoint_getter() {
         let url_str = "https://example.com/webhook";
         let url = Url::parse(url_str).unwrap();
-        let sender = HttpEventSender::new(url, false).unwrap();
+        let sender = HttpEventSender::new(url, false, 300, 10).unwrap();
         assert_eq!(sender.endpoint().as_str(), url_str);
     }
 }
