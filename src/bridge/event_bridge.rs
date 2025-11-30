@@ -201,6 +201,36 @@ where
         }
     }
 
+    /// Handle a reaction remove event
+    ///
+    /// # Arguments
+    ///
+    /// * `reaction` - The reaction event from Discord
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (may contain actions)
+    pub async fn handle_reaction_remove(
+        &self,
+        reaction: &Reaction,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!(
+            user_id = ?reaction.user_id,
+            message_id = %reaction.message_id,
+            channel_id = %reaction.channel_id,
+            "Processing reaction remove event"
+        );
+
+        // Build payload with optional channel metadata
+        let payload = self.build_reaction_payload(reaction).await;
+
+        // Forward event to webhook endpoint and return response
+        self.event_sender
+            .send("reaction_remove", &payload)
+            .await
+            .context("Failed to send reaction remove event to HTTP endpoint")
+    }
+
     /// Execute actions from webhook response
     ///
     /// # Arguments

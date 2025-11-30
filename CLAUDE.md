@@ -33,11 +33,11 @@ src/
     ├── discord_text.rs     # Discord text utilities (truncation, thread name generation)
     ├── reaction_payload.rs # ReactionPayload wrapper with GuildChannel metadata
     ├── action_target.rs    # ActionTarget abstraction for executing webhook actions
-    ├── sender_filter/      # Event filtering by sender type (MESSAGE, REACTION_ADD)
+    ├── sender_filter/      # Event filtering by sender type (MESSAGE, REACTION_ADD, REACTION_REMOVE)
     │   ├── mod.rs              # Public API re-exports
     │   ├── policy.rs           # SenderFilterPolicy (startup parsing)
     │   ├── message_filter.rs   # MessageFilter (runtime filtering for MESSAGE events)
-    │   ├── reaction_filter.rs  # ReactionFilter (runtime filtering for REACTION_ADD events)
+    │   ├── reaction_filter.rs  # ReactionFilter (runtime filtering for REACTION_ADD/REMOVE events)
     │   ├── filterable_message.rs # FilterableMessage trait
     │   ├── filterable_reaction.rs # FilterableReaction trait
     │   └── tests.rs            # Shared test helpers (MockMessage, MockReaction)
@@ -136,7 +136,7 @@ Business logic that orchestrates adapters:
 
 - **`sender_filter` module**: Filters events based on sender type (2-phase initialization)
   - **`SenderFilterPolicy`**: Parsed at startup from environment variables via serde
-    - Shared policy for both MESSAGE and REACTION_ADD events
+    - Shared policy for both MESSAGE and REACTION_ADD/REMOVE events
     - Creates `MessageFilter` via `for_user()` method
     - Creates `ReactionFilter` via `for_reaction()` method
   - **`MessageFilter`**: Created in `ready` event with bot's user_id for runtime filtering
@@ -173,9 +173,10 @@ Entry point that wires everything together:
   - MESSAGE_DELETE events: `MESSAGE_DELETE_DIRECT`, `MESSAGE_DELETE_GUILD`, `MESSAGE_DELETE_BULK_GUILD`
   - MESSAGE_UPDATE events: `MESSAGE_UPDATE_DIRECT`, `MESSAGE_UPDATE_GUILD`
   - REACTION_ADD events: `REACTION_ADD_DIRECT`, `REACTION_ADD_GUILD` (parsed into `Option<SenderFilterPolicy>`)
+  - REACTION_REMOVE events: `REACTION_REMOVE_DIRECT`, `REACTION_REMOVE_GUILD` (parsed into `Option<SenderFilterPolicy>`)
   - Context-independent: `READY`
 - Custom serde deserializer: `deserialize_sender_filter_policy`
-- Helper methods: `has_direct_message_events()`, `has_guild_message_events()`, `has_direct_reaction_add_events()`, `has_guild_reaction_add_events()`, etc.
+- Helper methods: `has_direct_message_events()`, `has_guild_message_events()`, `has_direct_reaction_add_events()`, `has_guild_reaction_add_events()`, `has_direct_reaction_remove_events()`, `has_guild_reaction_remove_events()`, etc.
 
 ### `adapters/http_event_sender.rs`
 - `HttpEventSender`: Sends events to HTTP endpoints and parses responses
@@ -252,7 +253,7 @@ Modular event filtering by sender type with 2-phase initialization:
 - Parsed at startup from environment variables using `from_policy("user,bot")`
 - Special values: `"all"` (everything), `""` (everything except self)
 - Implements `Default` trait (safe default: allow all except self)
-- Shared policy for both MESSAGE and REACTION_ADD events
+- Shared policy for both MESSAGE and REACTION_ADD/REMOVE events
 - Creates `MessageFilter` instances via `for_user(current_user_id)` method
 - Creates `ReactionFilter` instances via `for_reaction(current_user_id)` method
 - Tests: policy parsing, Default trait, for_user() and for_reaction() methods (using rstest)
@@ -270,7 +271,7 @@ Modular event filtering by sender type with 2-phase initialization:
 
 **`reaction_filter.rs` - ReactionFilter**
 - Created in `ready` event with bot's `user_id` embedded
-- Runtime filtering for REACTION_ADD events via `should_process(&reaction)` → bool
+- Runtime filtering for REACTION_ADD and REACTION_REMOVE events via `should_process(&reaction)` → bool
 - Classification categories (mutually exclusive, priority order):
   1. `self` - Bot's own reactions
   2. `bot` - Other bot reactions (excluding self)
@@ -399,7 +400,7 @@ src/bridge/sender_filter/
 18. **Enriched webhook payloads**: Send complete GuildChannel metadata to webhooks instead of just boolean flags (more flexible for webhook consumers)
 19. **Lock-free cache extraction**: Extract data from cache before await points to avoid Send trait issues with Arc<RwLock<>>
 20. **Optional payload fields**: Use `#[serde(skip_serializing_if)]` to keep webhook payloads clean (omit None values)
-21. **Shared SenderFilterPolicy**: Single policy abstraction for all sender-based filtering (MESSAGE, REACTION_ADD) reduces code duplication
+21. **Shared SenderFilterPolicy**: Single policy abstraction for all sender-based filtering (MESSAGE, REACTION_ADD, REACTION_REMOVE) reduces code duplication
 22. **Event-specific filter types**: MessageFilter and ReactionFilter tailor sender classification to event context (e.g., reactions exclude webhook/system types)
 23. **ActionTarget abstraction**: Unified target for webhook response actions enables different event types (Message, Reaction) to support same action types
 24. **Trait abstraction for event types**: FilterableReaction trait mirrors FilterableMessage pattern for consistent testing approach

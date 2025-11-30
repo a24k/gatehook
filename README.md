@@ -110,10 +110,14 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
       <td><code>REACTION_ADD_GUILD</code></td>
       <td>Reaction added to a message</td>
     </tr>
+    <tr>
+      <td>Reaction Remove</td>
+      <td><code>REACTION_REMOVE_DIRECT</code></td>
+      <td><code>REACTION_REMOVE_GUILD</code></td>
+      <td>Reaction removed from a message</td>
+    </tr>
   </tbody>
 </table>
-
-*More events coming soon: REACTION_REMOVE, etc.*
 
 #### Configuration Examples
 
@@ -147,11 +151,15 @@ MESSAGE_DELETE_DIRECT="all"
 # Example 8: Track reactions from users and bots
 REACTION_ADD_GUILD="user,bot"
 REACTION_ADD_DIRECT="user"
+
+# Example 9: Track reaction removal events
+REACTION_REMOVE_GUILD="user,bot"
+REACTION_REMOVE_DIRECT="user"
 ```
 
 ### Sender Type Classification
 
-Events with sender filtering (MESSAGE and REACTION_ADD) classify senders into mutually exclusive categories:
+Events with sender filtering (MESSAGE, REACTION_ADD, and REACTION_REMOVE) classify senders into mutually exclusive categories:
 
 #### For MESSAGE Events
 
@@ -163,7 +171,7 @@ Events with sender filtering (MESSAGE and REACTION_ADD) classify senders into mu
 
 **Note**: Discord webhooks have `author.bot = true`, but are classified as `webhook` rather than `bot` to allow separate filtering policies.
 
-#### For REACTION_ADD Events
+#### For REACTION_ADD and REACTION_REMOVE Events
 
 1. **self** - Bot's own reactions
 2. **bot** - Other bot reactions (excluding self)

@@ -51,6 +51,12 @@ pub struct Params {
     #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
     pub reaction_add_guild: Option<SenderFilterPolicy>,
 
+    // Reaction Remove Events
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub reaction_remove_direct: Option<SenderFilterPolicy>,
+    #[serde(default, deserialize_with = "deserialize_sender_filter_policy")]
+    pub reaction_remove_guild: Option<SenderFilterPolicy>,
+
     // Context-Independent Events
     #[serde(default)]
     pub ready: Option<String>,
@@ -90,6 +96,8 @@ impl std::fmt::Debug for Params {
             .field("message_update_guild", &self.message_update_guild)
             .field("reaction_add_direct", &self.reaction_add_direct)
             .field("reaction_add_guild", &self.reaction_add_guild)
+            .field("reaction_remove_direct", &self.reaction_remove_direct)
+            .field("reaction_remove_guild", &self.reaction_remove_guild)
             .field("ready", &self.ready)
             .finish()
     }
@@ -118,6 +126,16 @@ impl Params {
     /// Check if Guild Reaction Add events are enabled
     pub fn has_guild_reaction_add_events(&self) -> bool {
         self.reaction_add_guild.is_some()
+    }
+
+    /// Check if Direct Reaction Remove events are enabled
+    pub fn has_direct_reaction_remove_events(&self) -> bool {
+        self.reaction_remove_direct.is_some()
+    }
+
+    /// Check if Guild Reaction Remove events are enabled
+    pub fn has_guild_reaction_remove_events(&self) -> bool {
+        self.reaction_remove_guild.is_some()
     }
 
     /// Check if any MESSAGE_DELETE events are enabled
@@ -165,6 +183,8 @@ mod tests {
             message_update_guild: None,
             reaction_add_direct: None,
             reaction_add_guild: None,
+            reaction_remove_direct: None,
+            reaction_remove_guild: None,
             ready: None,
         };
 
