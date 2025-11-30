@@ -108,4 +108,12 @@ impl DiscordService for SerenityDiscordService {
 
         channel_id.send_message(&self.http, builder).await
     }
+
+    async fn get_message(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+    ) -> Result<Message, serenity::Error> {
+        self.http.get_message(channel_id, message_id).await
+    }
 }
