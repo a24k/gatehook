@@ -246,7 +246,16 @@ POST {HTTP_ENDPOINT}?handler=message
 | `message` | Always | Discord [Message](https://discord.com/developers/docs/resources/channel#message-object) object |
 | `channel` | Guild messages | Discord [GuildChannel](https://discord.com/developers/docs/resources/channel#channel-object) object (omitted for DMs or cache miss) |
 
-**Common channel types:** Thread channels: `10` (announcement), `11` (public), `12` (private). Regular channels: `0` (text), `2` (voice). See [full list](https://discord.com/developers/docs/resources/channel#channel-object-channel-types).
+**Channel types:**
+The `channel.type` field is an integer representing the channel type:
+- `0` - Text channel (`GUILD_TEXT`)
+- `2` - Voice channel (`GUILD_VOICE`)
+- `10` - Announcement thread (`ANNOUNCEMENT_THREAD`)
+- `11` - Public thread (`PUBLIC_THREAD`)
+- `12` - Private thread (`PRIVATE_THREAD`)
+- Other types: `4` (Category), `5` (News), `13` (Stage), `15` (Forum)
+
+See [Discord's Channel Types](https://discord.com/developers/docs/resources/channel#channel-object-channel-types) for the complete list.
 
 ### Ready Event Payload
 
