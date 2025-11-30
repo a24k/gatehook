@@ -531,7 +531,7 @@ Return a JSON object with an `actions` array:
 
 Reply to the message that triggered the event.
 
-**Available in:** `message` and `reaction_add` handlers
+**Available in:** `message`, `reaction_add`, and `reaction_remove` handlers
 
 ```json
 {
@@ -574,7 +574,7 @@ Reply to the message that triggered the event.
 
 Add a reaction emoji to the message that triggered the event.
 
-**Available in:** `message` and `reaction_add` handlers
+**Available in:** `message`, `reaction_add`, and `reaction_remove` handlers
 
 ```json
 {
@@ -608,7 +608,7 @@ Add a reaction emoji to the message that triggered the event.
 
 Create a thread from the message that triggered the event (or send a message if already in a thread).
 
-**Available in:** `message` and `reaction_add` handlers in guild channels only (not DMs)
+**Available in:** `message`, `reaction_add`, and `reaction_remove` handlers in guild channels only (not DMs)
 
 ```json
 {
