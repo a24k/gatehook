@@ -10,9 +10,10 @@ use crate::bridge::message_payload::MessagePayload;
 use crate::bridge::message_update_payload::MessageUpdatePayload;
 use crate::bridge::reaction_payload::ReactionPayload;
 use crate::bridge::ready_payload::ReadyPayload;
+use crate::bridge::resumed_payload::ResumedPayload;
 use anyhow::Context as _;
 use serenity::model::channel::{Message, Reaction};
-use serenity::model::event::MessageUpdateEvent;
+use serenity::model::event::{MessageUpdateEvent, ResumedEvent};
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use std::sync::Arc;
@@ -151,6 +152,33 @@ where
             .send("ready", &payload)
             .await
             .context("Failed to send ready event to HTTP endpoint")
+    }
+
+    /// Handle a resumed event
+    ///
+    /// Sends event to webhook and returns the response.
+    ///
+    /// # Arguments
+    ///
+    /// * `resumed` - The resumed event from Discord
+    ///
+    /// # Returns
+    ///
+    /// Response from webhook (may contain actions)
+    pub async fn handle_resumed(
+        &self,
+        resumed: &ResumedEvent,
+    ) -> anyhow::Result<Option<EventResponse>> {
+        debug!("Processing resumed event");
+
+        // Build payload with resumed event
+        let payload = ResumedPayload::new(resumed);
+
+        // Forward event to webhook endpoint and return response
+        self.event_sender
+            .send("resumed", &payload)
+            .await
+            .context("Failed to send resumed event to HTTP endpoint")
     }
 
     /// Handle a reaction add event

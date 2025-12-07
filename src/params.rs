@@ -76,6 +76,8 @@ pub struct Params {
     // Context-Independent Events
     #[serde(default)]
     pub ready: Option<String>,
+    #[serde(default)]
+    pub resumed: Option<String>,
 }
 
 /// Mask sensitive strings by showing only first and last few characters
@@ -117,6 +119,7 @@ impl std::fmt::Debug for Params {
             .field("reaction_remove_direct", &self.reaction_remove_direct)
             .field("reaction_remove_guild", &self.reaction_remove_guild)
             .field("ready", &self.ready)
+            .field("resumed", &self.resumed)
             .finish()
     }
 }
@@ -206,6 +209,7 @@ mod tests {
             reaction_remove_direct: None,
             reaction_remove_guild: None,
             ready: None,
+            resumed: None,
         };
 
         let debug_output = format!("{:?}", params);
