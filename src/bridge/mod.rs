@@ -7,4 +7,5 @@ pub mod message_payload;
 pub mod message_update_payload;
 pub mod reaction_payload;
 pub mod ready_payload;
+pub mod resumed_payload;
 pub mod sender_filter;

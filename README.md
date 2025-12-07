@@ -83,6 +83,11 @@ Events are configured via environment variables in the format: `<EVENT_NAME>_<CO
       <td>Bot connected to Discord</td>
     </tr>
     <tr>
+      <td>Resumed</td>
+      <td colspan="2" align="center"><code>RESUMED</code></td>
+      <td>Session resumed after reconnection</td>
+    </tr>
+    <tr>
       <td>Message</td>
       <td><code>MESSAGE_DIRECT</code></td>
       <td><code>MESSAGE_GUILD</code></td>
@@ -143,18 +148,21 @@ MESSAGE_DIRECT=""
 # Example 5: Enable READY event forwarding
 READY="all"
 
-# Example 6: Log message deletions (no filtering available for delete events)
+# Example 6: Monitor session reconnections
+RESUMED="all"
+
+# Example 7: Log message deletions (no filtering available for delete events)
 MESSAGE_DELETE_GUILD="all"
 MESSAGE_DELETE_BULK_GUILD="all"
 
-# Example 7: Monitor DM deletions
+# Example 8: Monitor DM deletions
 MESSAGE_DELETE_DIRECT="all"
 
-# Example 8: Track reactions from users and bots
+# Example 9: Track reactions from users and bots
 REACTION_ADD_GUILD="user,bot"
 REACTION_ADD_DIRECT="user"
 
-# Example 9: Track reaction removal events
+# Example 10: Track reaction removal events
 REACTION_REMOVE_GUILD="user,bot"
 REACTION_REMOVE_DIRECT="user"
 ```
@@ -213,6 +221,25 @@ POST {HTTP_ENDPOINT}?handler=ready
 ```
 
 Contains bot connection info: user, guilds, session_id, shard. See [Discord Ready event](https://discord.com/developers/docs/topics/gateway-events#ready).
+
+### Resumed Event Payload
+
+Sent when bot successfully resumes a session after reconnection (if `RESUMED` is enabled):
+
+```
+POST {HTTP_ENDPOINT}?handler=resumed
+```
+
+```json
+{
+  "resumed": {
+    "_trace": ["..."]
+    // ... see Discord Resumed event documentation
+  }
+}
+```
+
+Contains trace information for debugging. This event indicates the bot reconnected and resumed its session without losing state. See [Discord Resumed event](https://discord.com/developers/docs/topics/gateway-events#resumed).
 
 ### Message Event Payload
 

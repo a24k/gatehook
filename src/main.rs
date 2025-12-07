@@ -11,7 +11,7 @@ use tracing::{error, info};
 
 use serenity::async_trait;
 use serenity::model::channel::{Message, Reaction};
-use serenity::model::event::MessageUpdateEvent;
+use serenity::model::event::{MessageUpdateEvent, ResumedEvent};
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
@@ -139,6 +139,39 @@ impl EventHandler for Handler {
             }
             Err(err) => {
                 error!(?err, "Failed to handle ready event");
+            }
+        }
+    }
+
+    async fn resume(&self, _ctx: Context, resumed: ResumedEvent) {
+        info!("Session resumed successfully");
+
+        // Check if RESUMED event is enabled
+        if self.params.resumed.is_none() {
+            return;
+        }
+
+        // Get bridge (should be initialized in ready event)
+        let Some(bridge) = self.bridge.get() else {
+            error!("Bridge not initialized - this should not happen");
+            return;
+        };
+
+        // Handle event (send to webhook + execute actions if needed)
+        match bridge.handle_resumed(&resumed).await {
+            Ok(Some(event_response)) if !event_response.actions.is_empty() => {
+                // Currently resumed event doesn't have associated message context,
+                // so we log and skip action execution
+                tracing::warn!(
+                    action_count = event_response.actions.len(),
+                    "Resumed event received actions from webhook, but action execution is not supported for resumed events"
+                );
+            }
+            Ok(_) => {
+                // No response or empty actions - success
+            }
+            Err(err) => {
+                error!(?err, "Failed to handle resumed event");
             }
         }
     }
