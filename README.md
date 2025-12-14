@@ -35,19 +35,21 @@ docker run -d \
 services:
   gatehook:
     image: ghcr.io/a24k/gatehook:v1
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - HTTP_ENDPOINT=${HTTP_ENDPOINT}
-      - MESSAGE_GUILD=user
-      - REACTION_ADD_GUILD=user,bot
+    env_file:
+      - .env
     restart: unless-stopped
 ```
 
 2. Create a `.env` file:
 
 ```env
+# Required
 DISCORD_TOKEN=your_discord_bot_token
 HTTP_ENDPOINT=https://your-webhook-endpoint.com/webhook
+
+# Event configuration (optional)
+MESSAGE_GUILD=user
+REACTION_ADD_GUILD=user,bot
 ```
 
 3. Run:
