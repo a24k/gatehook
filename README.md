@@ -21,12 +21,12 @@ Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 sequenceDiagram
     participant Discord
     participant gatehook
-    participant Webhook
+    participant Your Webhook
 
     Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
     gatehook->>gatehook: Filter by sender type
-    gatehook->>Webhook: HTTP Request: event payload
-    Webhook->>gatehook: HTTP Response: actions (optional)
+    gatehook->>Your Webhook: HTTP Request: event payload
+    Your Webhook->>gatehook: HTTP Response: actions (optional)
     gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
 ```
 
