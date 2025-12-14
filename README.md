@@ -525,3 +525,7 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines and architecture details.
 
 - [Discord Developer Portal - Overview of Events](https://discord.com/developers/docs/events/overview)
 - [serenity](https://github.com/serenity-rs/serenity)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
