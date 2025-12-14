@@ -29,6 +29,7 @@ where
     discord_service: Arc<D>,
     event_sender: Arc<S>,
     channel_info: Arc<C>,
+    max_actions: usize,
 }
 
 impl<D, S, C> EventBridge<D, S, C>
@@ -44,11 +45,13 @@ where
     /// * `discord_service` - The Discord service for operations
     /// * `event_sender` - The event sender for forwarding events
     /// * `channel_info` - The channel info provider for retrieving channel information
-    pub fn new(discord_service: Arc<D>, event_sender: Arc<S>, channel_info: Arc<C>) -> Self {
+    /// * `max_actions` - Maximum number of actions to execute per event (for DoS protection)
+    pub fn new(discord_service: Arc<D>, event_sender: Arc<S>, channel_info: Arc<C>, max_actions: usize) -> Self {
         Self {
             discord_service,
             event_sender,
             channel_info,
+            max_actions,
         }
     }
 
@@ -265,6 +268,11 @@ where
     ///
     /// * `target` - The action target (message, reaction, etc.)
     /// * `event_response` - The response from webhook containing actions
+    ///
+    /// # Security
+    ///
+    /// Limits the number of actions to `max_actions` to prevent DoS attacks.
+    /// Logs action type only (not content) to prevent sensitive information exposure.
     pub async fn execute_actions(
         &self,
         target: impl Into<ActionTarget>,
@@ -272,10 +280,29 @@ where
     ) -> anyhow::Result<()> {
         let target = target.into();
 
-        for action in &event_response.actions {
+        let total_actions = event_response.actions.len();
+
+        // Limit actions for DoS protection
+        let actions_to_execute = if total_actions > self.max_actions {
+            tracing::warn!(
+                total_actions,
+                max_actions = self.max_actions,
+                "Too many actions in webhook response, truncating to max_actions"
+            );
+            &event_response.actions[..self.max_actions]
+        } else {
+            &event_response.actions[..]
+        };
+
+        for action in actions_to_execute {
             // Execute action (log error and continue with next)
+            // Note: Only log action type, not content, to prevent sensitive information exposure
             if let Err(err) = self.execute_action(&target, action).await {
-                error!(?err, ?action, "Failed to execute action, continuing with next");
+                error!(
+                    ?err,
+                    action_type = ?std::mem::discriminant(action),
+                    "Failed to execute action, continuing with next"
+                );
             }
         }
         Ok(())

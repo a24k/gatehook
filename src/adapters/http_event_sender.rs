@@ -10,6 +10,7 @@ use url::Url;
 pub struct HttpEventSender {
     client: reqwest::Client,
     endpoint: Url,
+    max_response_body_size: usize,
 }
 
 impl HttpEventSender {
@@ -21,11 +22,13 @@ impl HttpEventSender {
     /// * `insecure_mode` - If true, accept invalid TLS certificates
     /// * `timeout_secs` - Request timeout in seconds
     /// * `connect_timeout_secs` - Connection timeout in seconds
+    /// * `max_response_body_size` - Maximum response body size in bytes (for DoS protection)
     pub fn new(
         endpoint: Url,
         insecure_mode: bool,
         timeout_secs: u64,
         connect_timeout_secs: u64,
+        max_response_body_size: usize,
     ) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(insecure_mode)
@@ -37,6 +40,7 @@ impl HttpEventSender {
         Ok(Self {
             client,
             endpoint,
+            max_response_body_size,
         })
     }
 
@@ -54,7 +58,7 @@ impl EventSender for HttpEventSender {
         handler: &str,
         payload: &T,
     ) -> anyhow::Result<Option<EventResponse>> {
-        let response = self
+        let mut response = self
             .client
             .post(self.endpoint.clone())
             .query(&[("handler", handler)])
@@ -64,8 +68,26 @@ impl EventSender for HttpEventSender {
 
         let status = response.status();
 
+        // Read response body with streaming (DoS protection)
+        let mut body = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            // Check size before adding chunk
+            if body.len() + chunk.len() > self.max_response_body_size {
+                warn!(
+                    %handler,
+                    %status,
+                    current_size = body.len(),
+                    chunk_size = chunk.len(),
+                    max_size = self.max_response_body_size,
+                    "Response body exceeds limit during streaming, rejecting"
+                );
+                return Ok(None);
+            }
+            body.extend_from_slice(&chunk);
+        }
+
         // Try to parse the body regardless of status code
-        match response.json::<EventResponse>().await {
+        match serde_json::from_slice::<EventResponse>(&body) {
             Ok(event_response) => {
                 let action_count = event_response.actions.len();
                 if status.is_success() {
@@ -117,7 +139,7 @@ mod tests {
     #[case(true)]
     fn test_http_event_sender_creation(#[case] insecure_mode: bool) {
         let url = Url::parse("https://example.com/webhook").unwrap();
-        let sender = HttpEventSender::new(url, insecure_mode, 300, 10);
+        let sender = HttpEventSender::new(url, insecure_mode, 300, 10, 131_072);
         assert!(sender.is_ok());
     }
 
@@ -125,7 +147,7 @@ mod tests {
     fn test_endpoint_getter() {
         let url_str = "https://example.com/webhook";
         let url = Url::parse(url_str).unwrap();
-        let sender = HttpEventSender::new(url, false, 300, 10).unwrap();
+        let sender = HttpEventSender::new(url, false, 300, 10, 131_072).unwrap();
         assert_eq!(sender.endpoint().as_str(), url_str);
     }
 }

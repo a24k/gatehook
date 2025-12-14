@@ -12,6 +12,16 @@ fn default_http_connect_timeout() -> u64 {
     10
 }
 
+/// Default maximum number of actions to execute per event
+fn default_max_actions() -> usize {
+    5
+}
+
+/// Default maximum HTTP response body size in bytes (128KB)
+fn default_max_response_body_size() -> usize {
+    131_072
+}
+
 /// Deserialize environment variable string into SenderFilterPolicy
 fn deserialize_sender_filter_policy<'de, D>(
     deserializer: D,
@@ -35,6 +45,12 @@ pub struct Params {
     pub http_timeout: u64,
     #[serde(default = "default_http_connect_timeout")]
     pub http_connect_timeout: u64,
+    #[serde(default = "default_max_response_body_size")]
+    pub max_response_body_size: usize,
+
+    // Action Execution Configuration
+    #[serde(default = "default_max_actions")]
+    pub max_actions: usize,
 
     // ========================================
     // Event Configuration
@@ -107,6 +123,8 @@ impl std::fmt::Debug for Params {
             .field("http_endpoint", &self.http_endpoint)
             .field("http_timeout", &self.http_timeout)
             .field("http_connect_timeout", &self.http_connect_timeout)
+            .field("max_response_body_size", &self.max_response_body_size)
+            .field("max_actions", &self.max_actions)
             .field("message_direct", &self.message_direct)
             .field("message_guild", &self.message_guild)
             .field("message_delete_direct", &self.message_delete_direct)
@@ -197,6 +215,8 @@ mod tests {
             http_endpoint: "https://example.com/webhook/secret123456".to_string(),
             http_timeout: default_http_timeout(),
             http_connect_timeout: default_http_connect_timeout(),
+            max_response_body_size: default_max_response_body_size(),
+            max_actions: default_max_actions(),
             message_direct: None,
             message_guild: None,
             message_delete_direct: None,

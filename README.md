@@ -43,6 +43,8 @@ cargo run --release
 | `INSECURE_MODE` | Accept invalid TLS certificates (testing only) | `false` | `true` |
 | `HTTP_TIMEOUT` | HTTP request timeout in seconds | `300` (5 minutes) | `600` |
 | `HTTP_CONNECT_TIMEOUT` | HTTP connection timeout in seconds | `10` | `30` |
+| `MAX_RESPONSE_BODY_SIZE` | Maximum HTTP response body size in bytes (DoS protection) | `131072` (128KB) | `262144` |
+| `MAX_ACTIONS` | Maximum number of actions to execute per event (DoS protection) | `5` | `10` |
 | `RUST_LOG` | Logging level (see [Logging](#logging)) | `gatehook=info,serenity=warn` | `debug` |
 
 ### Event Handler Configuration
