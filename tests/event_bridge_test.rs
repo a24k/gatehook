@@ -47,7 +47,7 @@ async fn test_execute_actions_reply(
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("Test message", 111, 222);
 
@@ -81,7 +81,7 @@ async fn test_execute_actions_multiple_replies() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("Test", 555, 666);
 
@@ -120,7 +120,7 @@ async fn test_execute_actions_long_content_truncated() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("Test", 777, 888);
 
@@ -160,7 +160,7 @@ async fn test_handle_message_with_webhook_response() {
     };
     let event_sender = Arc::new(MockEventSender::with_response(event_response));
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("Hello", 999, 1000);
 
@@ -194,7 +194,7 @@ async fn test_execute_actions_react(#[case] emoji: &str) {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("Test message", 111, 222);
 
@@ -227,7 +227,7 @@ async fn test_execute_actions_thread_create_new() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), false); // Not in thread
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Original message", 111, 222, 333);
 
@@ -269,7 +269,7 @@ async fn test_execute_actions_thread_auto_name() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), false);
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("This is the original message content", 111, 222, 333);
 
@@ -304,7 +304,7 @@ async fn test_execute_actions_thread_long_name() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), false);
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Original message", 111, 222, 333);
 
@@ -340,7 +340,7 @@ async fn test_execute_actions_thread_already_in_thread() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), true); // Already in thread
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Thread message", 111, 222, 333);
 
@@ -377,7 +377,7 @@ async fn test_execute_actions_thread_create_with_custom_duration() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), false); // Creating NEW thread
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Original", 111, 222, 333);
 
@@ -419,7 +419,7 @@ async fn test_execute_actions_thread_in_dm_fails() {
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     // Configure channel_info to return an error for DM channel (simulating API behavior)
     channel_info.set_is_thread_error(ChannelId::new(222), "DM channels don't support threads".to_string());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_test_message("DM message", 111, 222); // No guild_id
 
@@ -452,7 +452,7 @@ async fn test_execute_actions_mixed_types() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
     channel_info.set_is_thread(ChannelId::new(222), false);
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Test", 111, 222, 333);
 
@@ -509,7 +509,7 @@ async fn test_handle_message_with_channel_info() {
     // Configure mock to return this channel
     channel_info.set_channel(ChannelId::new(1000), test_channel.clone());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Hello", 999, 1000, 5000);
 
@@ -543,7 +543,7 @@ async fn test_handle_message_without_channel_info() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let message = create_guild_message("Hello", 999, 1000, 5000);
 
@@ -576,7 +576,7 @@ async fn test_handle_message_delete() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let channel_id = ChannelId::new(999);
     let message_id = MessageId::new(888);
@@ -610,7 +610,7 @@ async fn test_handle_message_delete_without_guild() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let channel_id = ChannelId::new(999);
     let message_id = MessageId::new(888);
@@ -646,7 +646,7 @@ async fn test_handle_message_delete_bulk() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let channel_id = ChannelId::new(999);
     let message_ids = vec![
@@ -690,7 +690,7 @@ async fn test_handle_message_delete_bulk_empty() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let channel_id = ChannelId::new(999);
     let message_ids: Vec<MessageId> = vec![];
@@ -741,7 +741,7 @@ async fn test_handle_reaction_add_with_channel_info() {
     // Configure mock to return this channel
     channel_info.set_channel(ChannelId::new(2000), test_channel.clone());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(2222, 2000)
         .emoji("👍")
@@ -778,7 +778,7 @@ async fn test_handle_reaction_add_without_channel_info() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(2222, 2000)
         .emoji("👍")
@@ -815,7 +815,7 @@ async fn test_handle_reaction_add_dm() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(4444, 5000)
         .emoji("❤️")
@@ -870,7 +870,7 @@ async fn test_handle_reaction_remove_with_channel_info() {
     // Configure mock to return this channel
     channel_info.set_channel(ChannelId::new(2000), test_channel.clone());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(2222, 2000)
         .emoji("👍")
@@ -907,7 +907,7 @@ async fn test_handle_reaction_remove_without_channel_info() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(2222, 2000)
         .emoji("👍")
@@ -944,7 +944,7 @@ async fn test_handle_reaction_remove_dm() {
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
 
-    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service, event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(4444, 5000)
         .emoji("❤️")
@@ -988,7 +988,7 @@ async fn test_execute_actions_from_reaction() {
     let discord_service = Arc::new(MockDiscordService::new());
     let event_sender = Arc::new(MockEventSender::new());
     let channel_info = Arc::new(MockChannelInfoProvider::new());
-    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info);
+    let bridge = EventBridge::new(discord_service.clone(), event_sender.clone(), channel_info, 5);
 
     let reaction = MockReactionBuilder::new(8888, 9999)
         .emoji("🎉")

@@ -1,6 +1,10 @@
 
 # gatehook
 
+[![CI - Rust](https://github.com/a24k/gatehook/actions/workflows/ci-rust.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-rust.yml)
+[![CI - Docker](https://github.com/a24k/gatehook/actions/workflows/ci-docker.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-docker.yml)
+[![Security Audit](https://github.com/a24k/gatehook/actions/workflows/ci-audit.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-audit.yml)
+
 Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 
 ## Features
@@ -11,19 +15,89 @@ Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 - ⚡ **Dynamic Gateway Intents** - Automatically requests only the permissions needed for enabled events
 - 🔐 **Secure by Default** - Bot's own events filtered out by default to prevent loops
 
-## Quick Start
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant Discord
+    participant gatehook
+    participant Your Webhook
+
+    Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
+    gatehook->>gatehook: Filter by sender type
+    gatehook->>Your Webhook: HTTP Request: event payload
+    Your Webhook->>gatehook: HTTP Response: actions (optional)
+    gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
+```
+
+## Prerequisites
+
+You need a Discord bot with the following setup:
+
+1. Create a bot at [Discord Developer Portal](https://discord.com/developers/applications)
+2. Enable **MESSAGE CONTENT INTENT** in Bot settings (required for message events)
+3. Copy the bot token
+4. Start gatehook with your configuration
+5. Check the logs for "Bot install URL" and use it to invite the bot to your server
+
+For detailed instructions, see [Discord's Getting Started Guide](https://discord.com/developers/docs/getting-started).
+
+## Getting Started
+
+### Using Docker
 
 ```bash
-# 1. Set required environment variables
+docker run -d \
+  -e DISCORD_TOKEN="your_discord_bot_token" \
+  -e HTTP_ENDPOINT="https://your-webhook-endpoint.com/webhook" \
+  -e MESSAGE_GUILD="user" \
+  ghcr.io/a24k/gatehook:v1
+```
+
+### Using Docker Compose
+
+1. Create a `compose.yml`:
+
+```yaml
+services:
+  gatehook:
+    image: ghcr.io/a24k/gatehook:v1
+    env_file:
+      - .env
+    restart: unless-stopped
+```
+
+2. Create a `.env` file:
+
+```env
+# Required
+DISCORD_TOKEN=your_discord_bot_token
+HTTP_ENDPOINT=https://your-webhook-endpoint.com/webhook
+
+# Event configuration (optional)
+MESSAGE_GUILD=user
+REACTION_ADD_GUILD=user,bot
+```
+
+3. Run:
+
+```bash
+docker compose up -d
+```
+
+### From Source
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/a24k/gatehook.git
+cd gatehook
+
+# 2. Set environment variables
 export DISCORD_TOKEN="your_discord_bot_token"
 export HTTP_ENDPOINT="https://your-webhook-endpoint.com/webhook"
+export MESSAGE_GUILD="user"
 
-# 2. Enable desired events
-export MESSAGE_DIRECT="user,bot,webhook,system"  # DM: everything except self
-export MESSAGE_GUILD="user"                      # Guild: only human users
-export REACTION_ADD_GUILD="user,bot"             # Guild reactions: users and bots
-
-# 3. Run
+# 3. Build and run
 cargo run --release
 ```
 
@@ -43,6 +117,8 @@ cargo run --release
 | `INSECURE_MODE` | Accept invalid TLS certificates (testing only) | `false` | `true` |
 | `HTTP_TIMEOUT` | HTTP request timeout in seconds | `300` (5 minutes) | `600` |
 | `HTTP_CONNECT_TIMEOUT` | HTTP connection timeout in seconds | `10` | `30` |
+| `MAX_RESPONSE_BODY_SIZE` | Maximum HTTP response body size in bytes (DoS protection) | `131072` (128KB) | `262144` |
+| `MAX_ACTIONS` | Maximum number of actions to execute per event (DoS protection) | `5` | `10` |
 | `RUST_LOG` | Logging level (see [Logging](#logging)) | `gatehook=info,serenity=warn` | `debug` |
 
 ### Event Handler Configuration
@@ -449,3 +525,7 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines and architecture details.
 
 - [Discord Developer Portal - Overview of Events](https://discord.com/developers/docs/events/overview)
 - [serenity](https://github.com/serenity-rs/serenity)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

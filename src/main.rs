@@ -64,11 +64,12 @@ impl EventHandler for Handler {
                 self.params.insecure_mode,
                 self.params.http_timeout,
                 self.params.http_connect_timeout,
+                self.params.max_response_body_size,
             )
             .expect("HttpEventSender already validated")
         );
 
-        let bridge = EventBridge::new(discord_service, event_sender, channel_info);
+        let bridge = EventBridge::new(discord_service, event_sender, channel_info, self.params.max_actions);
         let _ = self.bridge.set(bridge);
 
         // Initialize active filters with current user ID

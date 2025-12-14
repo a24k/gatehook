@@ -167,7 +167,7 @@ Entry point that wires everything together:
 ### `params.rs`
 - `Params` struct: Configuration loaded from environment variables using serde
 - Required: `DISCORD_TOKEN`, `HTTP_ENDPOINT`
-- Optional: `INSECURE_MODE`, `RUST_LOG`
+- Optional: `INSECURE_MODE`, `RUST_LOG`, `HTTP_TIMEOUT`, `HTTP_CONNECT_TIMEOUT`, `MAX_RESPONSE_BODY_SIZE`, `MAX_ACTIONS`
 - Event configuration (all optional):
   - MESSAGE events: `MESSAGE_DIRECT`, `MESSAGE_GUILD` (parsed into `Option<SenderFilterPolicy>`)
   - MESSAGE_DELETE events: `MESSAGE_DELETE_DIRECT`, `MESSAGE_DELETE_GUILD`, `MESSAGE_DELETE_BULK_GUILD`
@@ -182,6 +182,7 @@ Entry point that wires everything together:
 - `HttpEventSender`: Sends events to HTTP endpoints and parses responses
 - Uses `url::Url` type for early URL validation
 - Configurable TLS certificate validation (insecure mode for testing)
+- **DoS protection**: Configurable response body size limit via `max_response_body_size` (default: 128KB)
 - **Response handling**: Parses `EventResponse` from JSON, handles non-2xx status codes gracefully
 
 ### `adapters/event_response.rs`
@@ -236,6 +237,8 @@ Entry point that wires everything together:
 - `EventBridge`: Core business logic
 - Generic design enables testing without external dependencies
 - Receives `http` from Context (not stored as state)
+- **DoS protection**: Limits number of actions to `max_actions` per event (default: 5)
+- **Security**: Logs action type only (not content) to prevent sensitive information exposure
 - **Action execution**:
   - Sequential processing of actions (preserves order)
   - Error isolation (one failure doesn't stop others)
