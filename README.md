@@ -15,6 +15,21 @@ Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 - ⚡ **Dynamic Gateway Intents** - Automatically requests only the permissions needed for enabled events
 - 🔐 **Secure by Default** - Bot's own events filtered out by default to prevent loops
 
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant Discord
+    participant gatehook
+    participant Webhook
+
+    Discord->>gatehook: Event (MESSAGE, REACTION, etc.)
+    gatehook->>gatehook: Filter by sender type
+    gatehook->>Webhook: POST event payload
+    Webhook->>gatehook: Response (optional actions)
+    gatehook->>Discord: Execute actions (Reply, React, Thread)
+```
+
 ## Getting Started
 
 ### Using Docker
