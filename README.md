@@ -15,19 +15,60 @@ Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 - ⚡ **Dynamic Gateway Intents** - Automatically requests only the permissions needed for enabled events
 - 🔐 **Secure by Default** - Bot's own events filtered out by default to prevent loops
 
-## Quick Start
+## Installation
+
+### Using Docker
 
 ```bash
-# 1. Set required environment variables
+docker run -d \
+  -e DISCORD_TOKEN="your_discord_bot_token" \
+  -e HTTP_ENDPOINT="https://your-webhook-endpoint.com/webhook" \
+  -e MESSAGE_GUILD="user" \
+  ghcr.io/a24k/gatehook:v1
+```
+
+### Using Docker Compose
+
+1. Create a `compose.yml`:
+
+```yaml
+services:
+  gatehook:
+    image: ghcr.io/a24k/gatehook:v1
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - HTTP_ENDPOINT=${HTTP_ENDPOINT}
+      - MESSAGE_GUILD=user
+      - REACTION_ADD_GUILD=user,bot
+    restart: unless-stopped
+```
+
+2. Create a `.env` file:
+
+```env
+DISCORD_TOKEN=your_discord_bot_token
+HTTP_ENDPOINT=https://your-webhook-endpoint.com/webhook
+```
+
+3. Run:
+
+```bash
+docker compose up -d
+```
+
+### From Source
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/a24k/gatehook.git
+cd gatehook
+
+# 2. Set environment variables
 export DISCORD_TOKEN="your_discord_bot_token"
 export HTTP_ENDPOINT="https://your-webhook-endpoint.com/webhook"
+export MESSAGE_GUILD="user"
 
-# 2. Enable desired events
-export MESSAGE_DIRECT="user,bot,webhook,system"  # DM: everything except self
-export MESSAGE_GUILD="user"                      # Guild: only human users
-export REACTION_ADD_GUILD="user,bot"             # Guild reactions: users and bots
-
-# 3. Run
+# 3. Build and run
 cargo run --release
 ```
 
