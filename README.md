@@ -25,7 +25,7 @@ sequenceDiagram
 
     Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
     gatehook->>gatehook: Filter by sender type
-    gatehook->>Webhook: HTTP POST: event payload
+    gatehook->>Webhook: HTTP Request: event payload
     Webhook->>gatehook: HTTP Response: actions (optional)
     gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
 ```
