@@ -30,6 +30,18 @@ sequenceDiagram
     gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
 ```
 
+## Prerequisites
+
+You need a Discord bot with the following setup:
+
+1. Create a bot at [Discord Developer Portal](https://discord.com/developers/applications)
+2. Enable **MESSAGE CONTENT INTENT** in Bot settings (required for message events)
+3. Copy the bot token
+4. Start gatehook with your configuration
+5. Check the logs for "Bot install URL" and use it to invite the bot to your server
+
+For detailed instructions, see [Discord's Getting Started Guide](https://discord.com/developers/docs/getting-started).
+
 ## Getting Started
 
 ### Using Docker
