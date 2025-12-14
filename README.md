@@ -1,6 +1,10 @@
 
 # gatehook
 
+[![CI - Rust](https://github.com/a24k/gatehook/actions/workflows/ci-rust.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-rust.yml)
+[![CI - Docker](https://github.com/a24k/gatehook/actions/workflows/ci-docker.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-docker.yml)
+[![Security Audit](https://github.com/a24k/gatehook/actions/workflows/ci-audit.yml/badge.svg)](https://github.com/a24k/gatehook/actions/workflows/ci-audit.yml)
+
 Bridge Discord Gateway (WebSocket) events to HTTP webhooks.
 
 ## Features
