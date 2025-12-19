@@ -27,13 +27,12 @@ sequenceDiagram
     Discord->>gatehook: READY event
     gatehook->>Your Webhook: HTTP Request: ready payload
 
-    loop Events
-        Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
-        gatehook->>gatehook: Filter by sender type
-        gatehook->>Your Webhook: HTTP Request: event payload
-        Your Webhook->>gatehook: HTTP Response: actions (optional)
-        gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
-    end
+    Note over Discord,Your Webhook: For each event from Discord
+    Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
+    gatehook->>gatehook: Filter by sender type
+    gatehook->>Your Webhook: HTTP Request: event payload
+    Your Webhook->>gatehook: HTTP Response: actions (optional)
+    gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
 ```
 
 ## Prerequisites
