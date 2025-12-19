@@ -27,8 +27,7 @@ sequenceDiagram
     Discord->>gatehook: READY event
     gatehook->>Your Webhook: HTTP Request: ready payload
 
-    rect rgb(240, 245, 250)
-        Note over Discord,Your Webhook: Event Handling (repeated for each event)
+    par Event Handling
         Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
         gatehook->>gatehook: Filter by sender type
         gatehook->>Your Webhook: HTTP Request: event payload
