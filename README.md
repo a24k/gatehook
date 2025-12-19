@@ -26,9 +26,7 @@ sequenceDiagram
     Note over gatehook: Startup
     gatehook->>Discord: WebSocket: Connect with token
     Discord->>gatehook: READY event
-    opt READY enabled
-        gatehook->>Your Webhook: HTTP Request: ready payload
-    end
+    gatehook->>Your Webhook: HTTP Request: ready payload
 
     Note over Discord,Your Webhook: Event Processing
     Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
