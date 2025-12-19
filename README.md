@@ -23,11 +23,17 @@ sequenceDiagram
     participant gatehook
     participant Your Webhook
 
-    Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
-    gatehook->>gatehook: Filter by sender type
-    gatehook->>Your Webhook: HTTP Request: event payload
-    Your Webhook->>gatehook: HTTP Response: actions (optional)
-    gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
+    gatehook->>Discord: WebSocket: Connect with token
+    Discord->>gatehook: READY event
+    gatehook->>Your Webhook: HTTP Request: ready payload
+
+    par Event Handling
+        Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
+        gatehook->>gatehook: Filter by sender type
+        gatehook->>Your Webhook: HTTP Request: event payload
+        Your Webhook->>gatehook: HTTP Response: actions (optional)
+        gatehook->>Discord: HTTP REST API: Execute actions (Reply, React, Thread)
+    end
 ```
 
 ## Prerequisites
