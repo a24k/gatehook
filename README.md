@@ -23,12 +23,10 @@ sequenceDiagram
     participant gatehook
     participant Your Webhook
 
-    Note over gatehook: Startup
     gatehook->>Discord: WebSocket: Connect with token
     Discord->>gatehook: READY event
     gatehook->>Your Webhook: HTTP Request: ready payload
 
-    Note over Discord,Your Webhook: Event Processing
     Discord->>gatehook: WebSocket: Event (MESSAGE, REACTION, etc.)
     gatehook->>gatehook: Filter by sender type
     gatehook->>Your Webhook: HTTP Request: event payload
